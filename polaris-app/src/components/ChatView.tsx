@@ -40,6 +40,13 @@ interface AudioState {
   currentUrl: string | null;  // Add tracking of current URL
 }
 
+// Add new interface for image dimensions
+interface ImageDimensions {
+  width: number;
+  height: number;
+  loaded: boolean;
+}
+
 const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   const [landmarkData, setLandmarkData] = useState<LandmarkData | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -63,6 +70,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   const [inputFocused, setInputFocused] = useState(false);
   const [isUserAtBottom, setIsUserAtBottom] = useState(true);
   const wasAtBottomRef = useRef(true);
+  const [imageDimensions, setImageDimensions] = useState<ImageDimensions>({ width: 0, height: 0, loaded: false });
 
   // Helper function to stop current audio playback and pending TTS request
   const stopCurrentAudioAndPendingTTS = () => {
@@ -501,6 +509,36 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
     onBack();
   };
 
+  // Add image pre-loading effect
+  useEffect(() => {
+    const img = new Image();
+    img.src = `/images/${landmark.image}.jpg`;
+    
+    img.onload = () => {
+      // Calculate dimensions while maintaining aspect ratio
+      const maxWidth = window.innerWidth - 48; // Account for padding
+      const aspectRatio = img.height / img.width;
+      const width = Math.min(maxWidth, img.width);
+      const height = width * aspectRatio;
+      
+      setImageDimensions({
+        width,
+        height,
+        loaded: true
+      });
+    };
+    
+    img.onerror = () => {
+      console.error('Failed to load image:', landmark.image);
+      // Set default dimensions if image fails to load
+      setImageDimensions({
+        width: 300,
+        height: 200,
+        loaded: false
+      });
+    };
+  }, [landmark.image]);
+
   return (
     <div className="fixed inset-0 flex flex-col w-full bg-white" style={{backgroundColor: "#fff", height: "100%"}}>
       {/* Header - Fixed positioning and proper layout */}
@@ -551,14 +589,50 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
         style={{
           backgroundColor: "#fff",
           overflowY: "auto",
-          paddingBottom: inputFocused ? 120 : 32, // extra space for keyboard/suggestions
-          paddingTop: 24 // extra space below header
+          paddingBottom: inputFocused ? 120 : 32,
+          paddingTop: 24
         }}
         onScroll={checkIfAtBottom}
       >
-        {/* Landmark Image */}
+        {/* Landmark Image with placeholder */}
         <div className="flex justify-center mb-6 mt-4">
-          <img src={`/images/${landmark.image}.jpg`} alt={landmark.name} className="max-w-full h-auto rounded-xl" />
+          <div 
+            style={{
+              width: imageDimensions.width || '100%',
+              height: imageDimensions.height || 200,
+              backgroundColor: '#f3f4f6',
+              borderRadius: '0.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative'
+            }}
+          >
+            {!imageDimensions.loaded && (
+              <div className="animate-pulse flex items-center justify-center w-full h-full">
+                <svg className="w-12 h-12 text-gray-300" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              </div>
+            )}
+            <img 
+              src={`/images/${landmark.image}.jpg`} 
+              alt={landmark.name} 
+              className="max-w-full h-auto rounded-xl"
+              style={{
+                opacity: imageDimensions.loaded ? 1 : 0,
+                transition: 'opacity 0.3s ease-in-out',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover'
+              }}
+              loading="lazy"
+            />
+          </div>
         </div>
         {chatMessages.map((msg, i) => (
           <div 
