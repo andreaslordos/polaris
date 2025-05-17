@@ -66,11 +66,14 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   });
   const [isMounted, setIsMounted] = useState(true);
   const pendingAudioRef = useRef<{ text: string; controller: AbortController } | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [isUserAtBottom, setIsUserAtBottom] = useState(true);
   const wasAtBottomRef = useRef(true);
   const [imageDimensions, setImageDimensions] = useState<ImageDimensions>({ width: 0, height: 0, loaded: false });
+  const [isMuted, setIsMuted] = useState(() => {
+    const saved = localStorage.getItem('isMuted');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
 
   // Helper function to stop current audio playback and pending TTS request
   const stopCurrentAudioAndPendingTTS = () => {
@@ -257,7 +260,8 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       // const capturedAudioUrl = audioUrl; // This line is removed as it's defined and assigned above
 
       // apply mute setting
-      audio.volume = isMuted ? 0 : 1;
+      audio.muted = isMuted;
+      audio.volume = 1;
 
       // Set up error handling
       audio.onerror = (e) => {
@@ -484,11 +488,12 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
 
   // Toggle mute/unmute without stopping playback
   const handleMuteToggle = () => {
-    setIsMuted(prev => {
+    setIsMuted((prev: boolean) => {
       const nextMuted = !prev;
       if (audioState.currentAudio) {
-        audioState.currentAudio.volume = nextMuted ? 0 : 1;
+        audioState.currentAudio.muted = nextMuted;
       }
+      localStorage.setItem('isMuted', JSON.stringify(nextMuted));
       return nextMuted;
     });
   };
