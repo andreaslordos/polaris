@@ -59,6 +59,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   });
   const [isMounted, setIsMounted] = useState(true);
   const pendingAudioRef = useRef<{ text: string; controller: AbortController } | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
 
   // Helper function to stop current audio playback and pending TTS request
   const stopCurrentAudioAndPendingTTS = () => {
@@ -229,6 +230,9 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
 
       const audio = new Audio(capturedAudioUrl); // Use capturedAudioUrl
       // const capturedAudioUrl = audioUrl; // This line is removed as it's defined and assigned above
+
+      // apply mute setting
+      audio.volume = isMuted ? 0 : 1;
 
       // Set up error handling
       audio.onerror = (e) => {
@@ -453,6 +457,17 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
     fu => !askedQuestions.has(fu.q)
   ) || [];
 
+  // Toggle mute/unmute without stopping playback
+  const handleMuteToggle = () => {
+    setIsMuted(prev => {
+      const nextMuted = !prev;
+      if (audioState.currentAudio) {
+        audioState.currentAudio.volume = nextMuted ? 0 : 1;
+      }
+      return nextMuted;
+    });
+  };
+
   // Modify the back button to stop everything
   const handleBack = () => {
     console.log('[Audio] Back button clicked, cleaning up');
@@ -464,7 +479,27 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
     <div className="flex flex-col w-full bg-white" style={{backgroundColor: "#fff", height: "100%"}}>
       {/* Header - Fixed positioning and proper layout */}
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 z-10 sticky top-0" style={{backgroundColor: "#fff"}}>
-        <div className="flex-1" /> {/* Spacer */}
+        <div className="flex-1 flex justify-start" style={{paddingLeft: "16px"}}>
+          <button
+            onClick={handleMuteToggle}
+            className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors"
+            aria-label={isMuted ? 'Unmute' : 'Mute'}
+          >
+            {isMuted ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="24" fill="none" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+                <line x1="23" y1="9" x2="17" y2="15"/>
+                <line x1="17" y1="9" x2="23" y2="15"/>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="24" fill="none" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+                <path d="M19 9a5 5 0 0 1 0 6"/>
+                <path d="M23 5a9 9 0 0 1 0 14"/>
+              </svg>
+            )}
+          </button>
+        </div>
         <h1 className="font-light text-black flex-1 text-center whitespace-nowrap px-2" style={{fontSize: '24px', color: "#000", letterSpacing: "0.5px"}}>
           {landmark.name}
         </h1>
