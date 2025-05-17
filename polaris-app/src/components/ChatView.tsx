@@ -37,6 +37,7 @@ interface CSVRecord {
 interface AudioState {
   isPlaying: boolean;
   currentAudio: HTMLAudioElement | null;
+  currentUrl: string | null;  // Add tracking of current URL
 }
 
 const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
@@ -54,7 +55,33 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   const [audioState, setAudioState] = useState<AudioState>({
     isPlaying: false,
     currentAudio: null,
+    currentUrl: null,
   });
+  const [isMounted, setIsMounted] = useState(true);
+  const pendingAudioRef = useRef<{ text: string; controller: AbortController } | null>(null);
+
+  // Helper function to stop current audio playback and pending TTS request
+  const stopCurrentAudioAndPendingTTS = () => {
+    console.log('[Audio] stopCurrentAudioAndPendingTTS called');
+    if (audioState.currentAudio) {
+      console.log('[Audio] Pausing current audio');
+      audioState.currentAudio.pause();
+      // No need to nullify audioState.currentAudio here directly, 
+      // setAudioState below will handle it.
+    }
+    if (audioState.currentUrl) {
+      console.log('[Audio] Revoking object URL (from stopCurrentAudioAndPendingTTS):', audioState.currentUrl);
+      URL.revokeObjectURL(audioState.currentUrl);
+    }
+    // Reset audio-specific parts of the state
+    setAudioState({ isPlaying: false, currentAudio: null, currentUrl: null });
+
+    if (pendingAudioRef.current) {
+      console.log('[Audio] Aborting pending TTS request');
+      pendingAudioRef.current.controller.abort();
+      pendingAudioRef.current = null;
+    }
+  };
 
   // Check if user is at bottom of chat
   const checkIfAtBottom = () => {
@@ -107,11 +134,6 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
                 ],
               };
               setLandmarkData(data);
-              
-              // Only stream the description if no chat messages exist
-              if (chatMessages.length === 0) {
-                streamDescription(data.twoMinDescription);
-              }
             } else {
               console.error(`No record found for ${landmark.name}`);
             }
@@ -124,54 +146,163 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       });
   }, [landmark.name]);
 
+  // Function to stop all audio and streaming (now revised)
+  const stopAll = () => {
+    console.log('[System] stopAll called: Stopping all activities');
+    
+    // Stop current audio and any pending TTS request first
+    stopCurrentAudioAndPendingTTS();
+
+    // Stop text streaming interval
+    if (streamIntervalRef.current) {
+      console.log('[System] Clearing text stream interval');
+      clearInterval(streamIntervalRef.current);
+      streamIntervalRef.current = null;
+    }
+
+    // Abort chat API fetch request (abortControllerRef is for /api/chat)
+    if (abortControllerRef.current) {
+      console.log('[System] Aborting chat API request');
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // pendingAudioRef is handled by stopCurrentAudioAndPendingTTS
+
+    setIsStreaming(false); // stopAll is responsible for resetting isStreaming
+    console.log('[System] isStreaming set to false by stopAll');
+  };
+
   // Function to play audio for a given text
   const playAudio = async (text: string) => {
+    if (!isMounted) {
+      console.log('[Audio] Component unmounted, skipping audio playback');
+      return;
+    }
+    let capturedAudioUrl: string | null = null; // Declare here, initialize to null
+
     try {
-      // Stop any currently playing audio
-      if (audioState.currentAudio) {
-        audioState.currentAudio.pause();
-        audioState.currentAudio = null;
-      }
+      console.log('[Audio] playAudio starting for text:', text.substring(0, 50) + '...');
+      
+      // Stop any currently playing audio and pending TTS first, without affecting isStreaming
+      stopCurrentAudioAndPendingTTS();
+
+      // Add a small delay to ensure cleanup is complete
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Create a new abort controller for this TTS request
+      const controller = new AbortController();
+      pendingAudioRef.current = { text, controller };
 
       const response = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
+        signal: controller.signal,
       });
+
+      // Check if component is still mounted
+      if (!isMounted) {
+        console.log('[Audio] Component unmounted during fetch, aborting');
+        return;
+      }
 
       if (!response.ok) throw new Error('Failed to generate audio');
 
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
+      const isCached = response.headers.get('X-Cache') === 'HIT';
+      console.log('[Audio] Response cache status:', isCached ? 'CACHED' : 'NEW');
 
-      audio.onended = () => {
-        setAudioState({ isPlaying: false, currentAudio: null });
-        URL.revokeObjectURL(audioUrl);
+      const audioBlob = await response.blob();
+      
+      if (!isMounted) { /* ... */ return; }
+
+      const audioUrl = URL.createObjectURL(audioBlob);
+      capturedAudioUrl = audioUrl; // Assign here
+      console.log('[Audio] Created object URL:', capturedAudioUrl);
+
+      const audio = new Audio(capturedAudioUrl); // Use capturedAudioUrl
+      // const capturedAudioUrl = audioUrl; // This line is removed as it's defined and assigned above
+
+      // Set up error handling
+      audio.onerror = (e) => {
+        console.error('[Audio] Playback error for URL:', capturedAudioUrl, e);
+        setAudioState(prev => {
+          if (prev.currentAudio === audio && prev.currentUrl === capturedAudioUrl) {
+            if (capturedAudioUrl) URL.revokeObjectURL(capturedAudioUrl); // Check if capturedAudioUrl is not null
+            return { isPlaying: false, currentAudio: null, currentUrl: null };
+          }
+          return prev;
+        });
       };
 
-      setAudioState({ isPlaying: true, currentAudio: audio });
-      await audio.play();
-    } catch (error) {
-      console.error('Error playing audio:', error);
+      // Set up completion handling
+      audio.onended = () => {
+        console.log('[Audio] Playback naturally ended for URL:', capturedAudioUrl);
+        setAudioState(prev => {
+          if (prev.currentAudio === audio && prev.currentUrl === capturedAudioUrl) {
+            if (capturedAudioUrl) URL.revokeObjectURL(capturedAudioUrl); // Check if capturedAudioUrl is not null
+            return { isPlaying: false, currentAudio: null, currentUrl: null };
+          }
+          return prev;
+        });
+      };
+
+      // Set up loading handling
+      audio.onloadstart = () => console.log('[Audio] Loading started');
+      audio.onloadeddata = () => console.log('[Audio] Data loaded');
+      audio.oncanplay = () => console.log('[Audio] Can play');
+
+      // Clear pending audio reference
+      pendingAudioRef.current = null;
+
+      // Set state before playing to prevent race conditions
+      setAudioState({ isPlaying: true, currentAudio: audio, currentUrl: audioUrl });
+      console.log('[Audio] State updated, attempting playback');
+      
+      // Play audio after state is set
+      try {
+        await audio.play();
+        console.log('[Audio] Playback started successfully');
+      } catch (playError) {
+        console.error('[Audio] Play error:', playError);
+        stopAll();
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('[Audio] TTS Fetch request aborted for text:', text.substring(0, 50) + '...');
+      } else {
+        console.error('[Audio] Error in playAudio for text:', text.substring(0, 50) + '...', error);
+      }
+      // Do not call global stopAll here, just ensure local cleanup if needed.
+      // stopCurrentAudioAndPendingTTS might have already been called by a subsequent playAudio call.
+      // Ensure audio state is cleared if this specific audio attempt failed early.
+      setAudioState(prev => {
+        // If this text's pending ref was current when error occurred, and not cleared by a new call
+        if (pendingAudioRef.current?.text === text) {
+            pendingAudioRef.current = null;
+        }
+        // If an audio object was created and its URL is the one we captured for this attempt
+        if (capturedAudioUrl && prev.currentUrl === capturedAudioUrl) { 
+             URL.revokeObjectURL(capturedAudioUrl);
+             return { isPlaying: false, currentAudio: null, currentUrl: null };
+        }
+        return prev;
+      });
     }
   };
 
-  // Modify streamDescription to include audio
+  // Modify streamDescription to prevent duplicate calls
   const streamDescription = (fullText: string) => {
     if (isStreaming) {
       console.log("Already streaming, ignoring request");
       return;
     }
     
+    console.log('Starting streamDescription');
     setIsStreaming(true);
     currentTextRef.current = '';
     let position = 0;
     const fullTextLength = fullText.length;
-    
-    if (streamIntervalRef.current) {
-      clearInterval(streamIntervalRef.current);
-    }
     
     // Start playing audio for the full text
     playAudio(fullText);
@@ -193,11 +324,21 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       });
       
       if (position >= fullTextLength) {
+        console.log('Streaming complete');
         clearInterval(streamIntervalRef.current!);
+        streamIntervalRef.current = null;
         setIsStreaming(false);
       }
     }, 30);
   };
+
+  // Add useEffect to handle initial description
+  useEffect(() => {
+    if (landmarkData && chatMessages.length === 0) {
+      console.log('Initial description triggered');
+      streamDescription(landmarkData.twoMinDescription);
+    }
+  }, [landmarkData, chatMessages.length]);
 
   // Modify startAIChat to include audio
   const startAIChat = async (question: string) => {
@@ -289,17 +430,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
 
   const handleSend = () => {
     if (isStreaming) {
-      // Clear streaming interval if exists
-      if (streamIntervalRef.current) {
-        clearInterval(streamIntervalRef.current);
-      }
-      
-      // Abort any fetch request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      
-      setIsStreaming(false);
+      stopAll();
     } else if (inputValue.trim() && landmarkData) {
       const q = inputValue.trim();
       setAskedQuestions(prev => new Set(prev).add(q));
@@ -308,22 +439,13 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
     }
   };
 
-  // Cleanup on unmount
+  // Setup and cleanup
   useEffect(() => {
+    setIsMounted(true);
     return () => {
-      if (streamIntervalRef.current) {
-        clearInterval(streamIntervalRef.current);
-      }
-    };
-  }, []);
-
-  // Cleanup audio on unmount
-  useEffect(() => {
-    return () => {
-      if (audioState.currentAudio) {
-        audioState.currentAudio.pause();
-        audioState.currentAudio = null;
-      }
+      console.log('[Audio] Component unmounting, cleaning up');
+      setIsMounted(false);
+      stopAll();
     };
   }, []);
 
@@ -331,6 +453,13 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   const availableFollowUps = landmarkData?.followUps.filter(
     fu => !askedQuestions.has(fu.q)
   ) || [];
+
+  // Modify the back button to stop everything
+  const handleBack = () => {
+    console.log('[Audio] Back button clicked, cleaning up');
+    stopAll();
+    onBack();
+  };
 
   return (
     <div className="flex flex-col h-screen w-full bg-white" style={{backgroundColor: "#fff"}}>
@@ -342,7 +471,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
         </h1>
         <div className="flex-1 flex justify-end" style={{paddingRight: "16px"}}> {/* Right-aligned container */}
           <button 
-            onClick={onBack} 
+            onClick={handleBack} 
             className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors"
             aria-label="Close"
             style={{marginRight: "4px"}}

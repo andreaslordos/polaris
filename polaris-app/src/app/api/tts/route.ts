@@ -32,18 +32,23 @@ export async function POST(req: Request) {
     }
 
     const audioPath = await getAudioPath(text);
+    console.log(`[TTS API] Request for text: ${text.substring(0, 50)}...`);
+    console.log(`[TTS API] Audio path: ${audioPath}`);
     
     // Check if audio file already exists
     if (fs.existsSync(audioPath)) {
+      console.log(`[TTS API] Using cached audio file`);
       const audioBuffer = fs.readFileSync(audioPath);
       return new NextResponse(audioBuffer, {
         headers: {
           'Content-Type': 'audio/mpeg',
           'Content-Length': audioBuffer.length.toString(),
+          'X-Cache': 'HIT',  // Add cache header
         },
       });
     }
 
+    console.log(`[TTS API] Generating new audio file`);
     // Generate new audio if it doesn't exist
     const mp3 = await openai.audio.speech.create({
       model: "tts-1",
@@ -55,15 +60,17 @@ export async function POST(req: Request) {
     
     // Save the audio file
     fs.writeFileSync(audioPath, buffer);
+    console.log(`[TTS API] Saved new audio file`);
 
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': 'audio/mpeg',
         'Content-Length': buffer.length.toString(),
+        'X-Cache': 'MISS',  // Add cache header
       },
     });
   } catch (error) {
-    console.error('Error in TTS API:', error);
+    console.error('[TTS API] Error:', error);
     return NextResponse.json({ error: 'Failed to generate speech' }, { status: 500 });
   }
 } 
