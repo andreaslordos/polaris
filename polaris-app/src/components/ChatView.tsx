@@ -40,9 +40,10 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [askedQuestions, setAskedQuestions] = useState<Set<string>>(new Set());
   const abortControllerRef = useRef<AbortController | null>(null);
-  const streamTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const currentTextRef = useRef<string>('');
+  const streamIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -94,40 +95,67 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       });
   }, [landmark.name]);
 
-  // Character-by-character streaming
-  const streamDescription = (text: string) => {
+  // Completely reworked streaming implementation to prevent duplicate characters
+  const streamDescription = (fullText: string) => {
+    if (isStreaming) {
+      console.log("Already streaming, ignoring request");
+      return;
+    }
+    
     setIsStreaming(true);
     
-    // Add a new message
-    setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+    // Reset the current text reference
+    currentTextRef.current = '';
     
-    // Stream the text one character at a time
-    let currentText = '';
-    let i = 0;
+    // Variable to track our position in the text
+    let position = 0;
+    const fullTextLength = fullText.length;
     
-    const streamCharacters = () => {
-      if (i < text.length) {
-        currentText += text.charAt(i);
-        setChatMessages(prev => {
-          const updated = [...prev];
-          updated[updated.length - 1] = { role: 'assistant', content: currentText };
-          return updated;
-        });
-        i++;
-        streamTimeoutRef.current = setTimeout(streamCharacters, 15); // Faster streaming
-      } else {
+    // Clear any existing intervals
+    if (streamIntervalRef.current) {
+      clearInterval(streamIntervalRef.current);
+    }
+    
+    // Create a new streaming interval
+    streamIntervalRef.current = setInterval(() => {
+      // Add the next character
+      currentTextRef.current += fullText[position];
+      position++;
+      
+      // Update or create the message with the current text
+      setChatMessages(prev => {
+        if (prev.length === 0 || prev[prev.length - 1].role !== 'assistant') {
+          return [...prev, { role: 'assistant', content: currentTextRef.current }];
+        }
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          role: 'assistant',
+          content: currentTextRef.current
+        };
+        return updated;
+      });
+      
+      // Exit if we've reached the end of the text
+      if (position >= fullTextLength) {
+        clearInterval(streamIntervalRef.current!);
         setIsStreaming(false);
       }
-    };
-    
-    streamCharacters();
+    }, 30); // Slightly slower for better reliability
   };
 
   const startAIChat = async (question: string) => {
+    if (isStreaming) {
+      console.log("Already streaming, ignoring request");
+      return;
+    }
+    
     setIsStreaming(true);
     const controller = new AbortController();
     abortControllerRef.current = controller;
     const body = { landmarkName: landmarkData!.name, question, history: chatMessages };
+    
+    // Reset current text
+    currentTextRef.current = '';
     
     try {
       const res = await fetch('/api/chat', {
@@ -146,8 +174,6 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let done = false;
-      setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-      const aiIndex = chatMessages.length;
       
       while (!done) {
         const { value, done: d } = await reader.read();
@@ -162,11 +188,15 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
               const parsed = JSON.parse(data);
               const txt = parsed.choices[0].delta?.content;
               if (txt) {
+                // Update our reference first
+                currentTextRef.current += txt;
+                
+                // Then update state with the complete current text
                 setChatMessages(prev => {
                   const m = [...prev];
-                  m[aiIndex] = { 
+                  m[m.length - 1] = { 
                     role: 'assistant', 
-                    content: m[aiIndex]?.content + txt || txt 
+                    content: currentTextRef.current
                   };
                   return m;
                 });
@@ -196,8 +226,16 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
 
   const handleSend = () => {
     if (isStreaming) {
-      if (streamTimeoutRef.current) clearTimeout(streamTimeoutRef.current);
-      abortControllerRef.current?.abort();
+      // Clear streaming interval if exists
+      if (streamIntervalRef.current) {
+        clearInterval(streamIntervalRef.current);
+      }
+      
+      // Abort any fetch request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
       setIsStreaming(false);
     } else if (inputValue.trim() && landmarkData) {
       const q = inputValue.trim();
@@ -208,8 +246,13 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
     }
   };
 
-  useEffect(() => () => { 
-    if (streamTimeoutRef.current) clearTimeout(streamTimeoutRef.current); 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (streamIntervalRef.current) {
+        clearInterval(streamIntervalRef.current);
+      }
+    };
   }, []);
 
   // Filter out already asked follow-up questions
@@ -219,22 +262,25 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
 
   return (
     <div className="flex flex-col h-screen w-full bg-white" style={{backgroundColor: "#fff"}}>
-      {/* Header - with X at top right instead of back arrow */}
-      <header className="flex items-center justify-center px-4 py-3 bg-white border-b border-gray-200 z-10 relative" style={{backgroundColor: "#fff"}}>
-        <h1 className="text-lg font-bold text-black" style={{fontWeight: 700, color: "#000", position: "absolute", left: "50%", transform: "translateX(-50%)"}}>
+      {/* Header - Fixed positioning and proper layout */}
+      <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 z-10 sticky top-0" style={{backgroundColor: "#fff"}}>
+        <div className="flex-1" /> {/* Spacer */}
+        <h1 className="text-sm font-bold text-black flex-1 text-center whitespace-nowrap px-2" style={{fontWeight: 500, color: "#000"}}>
           {landmark.name}
         </h1>
-        <button 
-          onClick={onBack} 
-          className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors absolute right-4"
-          aria-label="Close"
-          style={{marginTop: "4px", marginRight: "4px"}}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
+        <div className="flex-1 flex justify-end" style={{paddingRight: "16px"}}> {/* Right-aligned container */}
+          <button 
+            onClick={onBack} 
+            className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors"
+            aria-label="Close"
+            style={{marginRight: "4px"}}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
       </header>
       
       {/* Messages Container */}
@@ -301,7 +347,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
         </div>
       )}
       
-      {/* Input Area - slightly shorter, more space between input and button */}
+      {/* Input Area */}
       <div className="flex items-center px-4 py-4 border-t border-gray-200 bg-white" style={{backgroundColor: "#fff"}}>
         <input
           type="text"
@@ -314,7 +360,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
             backgroundColor: "white", 
             color: "#374151",
             padding: "12px 20px",
-            height: "50px", // Slightly shorter
+            height: "50px",
             fontSize: "16px"
           }}
           placeholder="Ask about this landmark..."
@@ -323,7 +369,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
         <button 
           onClick={handleSend} 
           disabled={isStreaming && !inputValue.trim()}
-          className="flex items-center justify-center ml-4 rounded-full" // More space between input and button
+          className="flex items-center justify-center ml-4 rounded-full" 
           style={{
             backgroundColor: isStreaming ? "#ef4444" : "#0B5CD5",
             width: "42px",
@@ -343,7 +389,6 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
         </button>
       </div>
       
-      {/* Global styles */}
       <style jsx global>{`
         .hide-scrollbar {
           -ms-overflow-style: none;
