@@ -74,6 +74,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
     const saved = localStorage.getItem('isMuted');
     return saved !== null ? JSON.parse(saved) : true;
   });
+  const [isPreparingAudio, setIsPreparingAudio] = useState(false);
 
   // Helper function to stop current audio playback and pending TTS request
   const stopCurrentAudioAndPendingTTS = () => {
@@ -90,6 +91,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
     }
     // Reset audio-specific parts of the state
     setAudioState({ isPlaying: false, currentAudio: null, currentUrl: null });
+    setIsPreparingAudio(false); // Reset audio preparation state
 
     if (pendingAudioRef.current) {
       console.log('[Audio] Aborting pending TTS request');
@@ -226,6 +228,9 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       // Add a small delay to ensure cleanup is complete
       await new Promise(resolve => setTimeout(resolve, 50));
 
+      // Set preparing audio state to true for this specific attempt
+      setIsPreparingAudio(true);
+
       // Create a new abort controller for this TTS request
       const controller = new AbortController();
       pendingAudioRef.current = { text, controller };
@@ -282,6 +287,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
           }
           return prev;
         });
+        setIsPreparingAudio(false); // Audio preparation failed or playback error
       };
 
       // Set up completion handling
@@ -299,7 +305,10 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       // Set up loading handling
       audio.onloadstart = () => console.log('[Audio] Loading started');
       audio.onloadeddata = () => console.log('[Audio] Data loaded');
-      audio.oncanplay = () => console.log('[Audio] Can play');
+      audio.oncanplay = () => {
+        console.log('[Audio] Can play');
+        setIsPreparingAudio(false); // Corrected: Should be in oncanplay
+      };
 
       // Clear pending audio reference
       pendingAudioRef.current = null;
@@ -322,6 +331,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       } else {
         console.error('[Audio] Error in playAudio for text:', text.substring(0, 50) + '...', error.message || error);
       }
+      setIsPreparingAudio(false); // Audio preparation failed due to an error
       // Do not call global stopAll here, just ensure local cleanup if needed.
       // stopCurrentAudioAndPendingTTS might have already been called by a subsequent playAudio call.
       // Ensure audio state is cleared if this specific audio attempt failed early.
@@ -564,10 +574,17 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
         <div className="flex-1 flex justify-start" style={{paddingLeft: "16px"}}>
           <button
             onClick={handleMuteToggle}
-            className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors"
-            aria-label={isMuted ? 'Unmute' : 'Mute'}
+            className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center justify-center"
+            style={{ width: '48px', height: '40px' }} // Fixed size for consistency
+            aria-label={isPreparingAudio ? 'Loading audio' : (isMuted ? 'Unmute' : 'Mute')}
+            disabled={isPreparingAudio}
           >
-            {isMuted ? (
+            {isPreparingAudio ? (
+              <svg className="animate-spin h-6 w-6 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : isMuted ? (
               <svg xmlns="http://www.w3.org/2000/svg" width="32" height="24" fill="none" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M11 5L6 9H2v6h4l5 4V5z"/>
                 <line x1="23" y1="9" x2="17" y2="15"/>
