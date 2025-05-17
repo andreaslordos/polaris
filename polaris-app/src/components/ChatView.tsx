@@ -462,7 +462,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   };
 
   return (
-    <div className="flex flex-col h-screen w-full bg-white" style={{backgroundColor: "#fff"}}>
+    <div className="flex flex-col w-full bg-white" style={{backgroundColor: "#fff", height: "100%"}}>
       {/* Header - Fixed positioning and proper layout */}
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 z-10 sticky top-0" style={{backgroundColor: "#fff"}}>
         <div className="flex-1" /> {/* Spacer */}
@@ -520,76 +520,79 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
         <div ref={messagesEndRef} className="h-4" />
       </div>
       
-      {/* Quick Reply Buttons - only show if there are available follow-ups */}
-      {availableFollowUps.length > 0 && (
-        <div className="px-4 py-4 border-t border-gray-200 bg-white" style={{backgroundColor: "#fff", padding: "32px 24px"}}>
-          <div className="overflow-x-auto hide-scrollbar">
-            <div className="flex space-x-8 py-2 w-max">
-              {availableFollowUps.map((fu, idx) => (
-                <button 
-                  key={idx} 
-                  onClick={() => handleFollowUp(fu.q)} 
-                  disabled={isStreaming}
-                  className="flex-shrink-0 flex items-center whitespace-nowrap transition-colors disabled:opacity-50 font-medium"
-                  style={{
-                    backgroundColor: "#E6EFFD", 
-                    color: "#0B5CD5",
-                    padding: "14px 20px",
-                    borderRadius: "24px",
-                    fontSize: "15px",
-                    fontWeight: 500,
-                    minHeight: "48px",
-                    marginRight: "16px"
-                  }}
-                >
-                  {fu.q}
-                </button>
-              ))}
+      {/* Footer Container - Sticky */}
+      <div className="sticky bottom-0 z-10 bg-white">
+        {/* Quick Reply Buttons - only show if there are available follow-ups */}
+        {availableFollowUps.length > 0 && (
+          <div className="px-4 py-4 border-t border-gray-200" style={{padding: "32px 24px"}}>
+            <div className="overflow-x-auto hide-scrollbar">
+              <div className="flex space-x-8 py-2 w-max">
+                {availableFollowUps.map((fu, idx) => (
+                  <button 
+                    key={idx} 
+                    onClick={() => handleFollowUp(fu.q)} 
+                    disabled={isStreaming}
+                    className="flex-shrink-0 flex items-center whitespace-nowrap transition-colors disabled:opacity-50 font-medium"
+                    style={{
+                      backgroundColor: "#E6EFFD", 
+                      color: "#0B5CD5",
+                      padding: "14px 20px",
+                      borderRadius: "24px",
+                      fontSize: "15px",
+                      fontWeight: 500,
+                      minHeight: "48px",
+                      marginRight: "16px"
+                    }}
+                  >
+                    {fu.q}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      
-      {/* Input Area */}
-      <div className="flex items-center px-4 py-4 border-t border-gray-200 bg-white" style={{backgroundColor: "#fff"}}>
-        <input
-          type="text"
-          value={inputValue}
-          onChange={e => setInputValue(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
-          disabled={isStreaming}
-          className="flex-1 border border-gray-300 rounded-full text-[16px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          style={{
-            backgroundColor: "white", 
-            color: "#374151",
-            padding: "12px 20px",
-            height: "50px",
-            fontSize: "16px"
-          }}
-          placeholder="Ask about this landmark..."
-        />
+        )}
         
-        <button 
-          onClick={handleSend} 
-          disabled={!isStreaming && !inputValue.trim()}
-          className="flex items-center justify-center ml-4 rounded-full" 
-          style={{
-            backgroundColor: isStreaming ? "#ef4444" : "#0B5CD5",
-            width: "42px",
-            height: "42px"
-          }}
-          aria-label={isStreaming ? "Stop" : "Send"}
-        >
-          {isStreaming ? (
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white">
-              <rect x="6" y="6" width="12" height="12" rx="2" ry="2" />
-            </svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white">
-              <path d="M2 21l21-9L2 3v7l15 2-15 2z" />
-            </svg>
-          )}
-        </button>
+        {/* Input Area */}
+        <div className="flex items-center px-4 py-4 border-t border-gray-200">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={e => setInputValue(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
+            disabled={isStreaming}
+            className="flex-1 border border-gray-300 rounded-full text-[16px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{
+              backgroundColor: "white", 
+              color: "#374151",
+              padding: "12px 20px",
+              height: "50px",
+              fontSize: "16px"
+            }}
+            placeholder="Ask about this landmark..."
+          />
+          
+          <button 
+            onClick={handleSend} 
+            disabled={!isStreaming && !inputValue.trim()}
+            className="flex items-center justify-center ml-4 rounded-full" 
+            style={{
+              backgroundColor: isStreaming ? "#ef4444" : "#0B5CD5",
+              width: "42px",
+              height: "42px"
+            }}
+            aria-label={isStreaming ? "Stop" : "Send"}
+          >
+            {isStreaming ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white">
+                <rect x="6" y="6" width="12" height="12" rx="2" ry="2" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white">
+                <path d="M2 21l21-9L2 3v7l15 2-15 2z" />
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
       
       <style jsx global>{`
