@@ -7,11 +7,12 @@ import 'leaflet/dist/leaflet.css';
 import ChatModal from './ChatModal'; // We'll rename this later
 import ChatView from './ChatView';
 // Custom image marker icon
-const createImageMarker = (imageName: string) => {
+const createImageMarker = (imageName: string, isClicked: boolean = false) => {
   return L.divIcon({
     className: 'custom-marker',
     html: `
       <div style="
+        position: relative;
         width: 40px;
         height: 40px;
         border-radius: 50%;
@@ -31,6 +32,15 @@ const createImageMarker = (imageName: string) => {
             object-fit: cover;
           "
         />
+        ${isClicked ? `<div style="
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(144,238,144,0.7);
+          border-radius: 50%;
+        "></div>` : ''}
       </div>
     `,
     iconSize: [40, 40],
@@ -284,6 +294,31 @@ export default function HarvardMap() {
   const [tilesLoaded, setTilesLoaded] = useState(false);
   const [selectedLandmark, setSelectedLandmark] = useState<any | null>(null);
   const [showChat, setShowChat] = useState(false); // New state to control view
+  // Track clicked landmarks for progress
+  const [clickedMarkers, setClickedMarkers] = useState<Set<string>>(new Set());
+
+  // Load clicked markers from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const raw = window.localStorage.getItem('clickedMarkers');
+      if (raw) {
+        try {
+          const arr: string[] = JSON.parse(raw);
+          setClickedMarkers(new Set(arr));
+        } catch (e) {
+          console.error('Failed to parse clickedMarkers from localStorage', e);
+        }
+      }
+    }
+  }, []);
+
+  // Persist clicked markers to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const arr = Array.from(clickedMarkers);
+      window.localStorage.setItem('clickedMarkers', JSON.stringify(arr));
+    }
+  }, [clickedMarkers]);
 
   useEffect(() => {
     // Check if we're offline
@@ -329,6 +364,8 @@ export default function HarvardMap() {
   }, []);
 
   const handleMarkerClick = (landmark: any) => {
+    // Mark this landmark as clicked
+    setClickedMarkers(prev => new Set(prev).add(landmark.name));
     setSelectedLandmark(landmark);
     setShowChat(true); // Switch to chat view
     console.log("Selected landmark:", landmark);
@@ -376,7 +413,7 @@ export default function HarvardMap() {
           <Marker
             key={index}
             position={[landmark.lat, landmark.lng]}
-            icon={createImageMarker(landmark.image)}
+            icon={createImageMarker(landmark.image, clickedMarkers.has(landmark.name))}
             eventHandlers={{
               click: () => handleMarkerClick(landmark),
             }}
