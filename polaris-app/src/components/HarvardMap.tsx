@@ -5,12 +5,6 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from 'rea
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// Force the browser to cache tiles
-const cacheOptions = {
-  crossOrigin: true,
-  maxAge: 60 * 60 * 24 * 7, // Cache for one week
-};
-
 // Custom image marker icon
 const createImageMarker = (imageName: string) => {
   return L.divIcon({
@@ -128,7 +122,7 @@ const LANDMARKS = [
     name: 'Massachusetts Hall',
     lat: 42.374442,
     lng: -71.118316,
-    description: 'Harvard\'s oldest standing building',
+    description: 'Harvard&apos;s oldest standing building',
     image: 'massachusetts_hall'
   },
   {
@@ -156,7 +150,7 @@ const LANDMARKS = [
     name: 'Widener Library',
     lat: 42.373637,
     lng: -71.116430,
-    description: 'Harvard\'s flagship library',
+    description: 'Harvard&apos;s flagship library',
     image: 'widener_library'
   },
   {
@@ -248,50 +242,34 @@ function MapDebug() {
 // User location component
 function UserLocation() {
   const map = useMap();
-  const [position, setPosition] = useState<[number, number] | null>(null);
+  const [position, setPosition] = useState<L.LatLng | null>(null);
 
   useEffect(() => {
     if (!navigator.geolocation) {
-      console.error('Geolocation is not supported by your browser');
+      console.log('Geolocation is not supported by your browser');
       return;
     }
 
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        const { latitude, longitude, accuracy } = pos.coords;
-        setPosition([latitude, longitude]);
-        
-        // Smoothly pan to user location when first acquired
-        if (!position) {
-          map.flyTo([latitude, longitude], map.getZoom(), {
-            duration: 1.5,
-          });
-        }
+        const newPos = L.latLng(pos.coords.latitude, pos.coords.longitude);
+        setPosition(newPos);
       },
-      (error) => {
-        console.error('Error getting location:', error);
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 5000,
+      (err) => {
+        console.error('Error getting location:', err);
       }
     );
 
     return () => {
       navigator.geolocation.clearWatch(watchId);
     };
-  }, [map, position]);
+  }, []);
 
-  if (!position) return null;
-
-  return (
-    <Marker
-      position={position}
-      icon={createUserLocationMarker()}
-    >
+  return position ? (
+    <Marker position={position} icon={createUserLocationMarker()}>
+      <Popup>You are here</Popup>
     </Marker>
-  );
+  ) : null;
 }
 
 export default function HarvardMap() {
