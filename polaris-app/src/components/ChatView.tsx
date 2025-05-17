@@ -38,17 +38,21 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [askedQuestions, setAskedQuestions] = useState<Set<string>>(new Set());
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null); // For scrolling to bottom
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, [chatMessages]);
 
   useEffect(() => {
-    setChatMessages([]);
+    // Don't reset chat messages to preserve history
     setInputValue('');
     fetch('/Harvard_Yard_KB_AI_Tour.csv')
       .then(res => {
@@ -59,14 +63,11 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
         return res.text();
       })
       .then(csvText => {
-        console.log("CSV data fetched successfully");
         Papa.parse<CSVRecord>(csvText, {
           header: true,
           complete: (results) => {
-            console.log("CSV parsed, records:", results.data.length);
             const record = results.data.find(r => r.Name === landmark.name);
             if (record) {
-              console.log(`Found record for ${landmark.name}`);
               const data: LandmarkData = {
                 name: record.Name,
                 twoMinDescription: record['2MinDescription'],
@@ -76,7 +77,11 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
                 ],
               };
               setLandmarkData(data);
-              streamDescription(data.twoMinDescription);
+              
+              // Only stream the description if no chat messages exist
+              if (chatMessages.length === 0) {
+                streamDescription(data.twoMinDescription);
+              }
             } else {
               console.error(`No record found for ${landmark.name}`);
             }
@@ -89,35 +94,101 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       });
   }, [landmark.name]);
 
+  // Character-by-character streaming
   const streamDescription = (text: string) => {
     setIsStreaming(true);
-    let idx = 0;
-    const words = text.split(' ');
+    
+    // Add a new message
     setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-    const step = () => {
-      if (idx < words.length) {
+    
+    // Stream the text one character at a time
+    let currentText = '';
+    let i = 0;
+    
+    const streamCharacters = () => {
+      if (i < text.length) {
+        currentText += text.charAt(i);
         setChatMessages(prev => {
-          const last = { ...prev[prev.length - 1] };
-          last.content += (idx === 0 ? '' : ' ') + words[idx];
-          return [...prev.slice(0, prev.length - 1), last];
+          const updated = [...prev];
+          updated[updated.length - 1] = { role: 'assistant', content: currentText };
+          return updated;
         });
-        if (navigator.vibrate) navigator.vibrate(10);
-        idx++;
-        streamTimeoutRef.current = setTimeout(step, 100);
+        i++;
+        streamTimeoutRef.current = setTimeout(streamCharacters, 15); // Faster streaming
       } else {
         setIsStreaming(false);
       }
     };
-    step();
+    
+    streamCharacters();
   };
 
   const startAIChat = async (question: string) => {
-    // Same implementation as before
-    // ...
+    setIsStreaming(true);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const body = { landmarkName: landmarkData!.name, question, history: chatMessages };
+    
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      
+      if (!res.ok) {
+        console.error('Chat API error');
+        setIsStreaming(false);
+        return;
+      }
+      
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+      const aiIndex = chatMessages.length;
+      
+      while (!done) {
+        const { value, done: d } = await reader.read();
+        done = d;
+        if (value) {
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n').filter(l => l.startsWith('data:'));
+          for (const l of lines) {
+            const data = l.replace(/^data: /, '').trim();
+            if (data === '[DONE]') { done = true; break; }
+            try {
+              const parsed = JSON.parse(data);
+              const txt = parsed.choices[0].delta?.content;
+              if (txt) {
+                setChatMessages(prev => {
+                  const m = [...prev];
+                  m[aiIndex] = { 
+                    role: 'assistant', 
+                    content: m[aiIndex]?.content + txt || txt 
+                  };
+                  return m;
+                });
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error in chat API:', error);
+    } finally {
+      setIsStreaming(false);
+    }
   };
 
   const handleFollowUp = (q: string) => {
+    // Add to asked questions set
+    setAskedQuestions(prev => new Set(prev).add(q));
+    
+    // Add user question to chat
     setChatMessages(prev => [...prev, { role: 'user', content: q }]);
+    
     const fu = landmarkData?.followUps.find(f => f.q === q);
     if (fu) streamDescription(fu.a);
     else startAIChat(q);
@@ -130,95 +201,163 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       setIsStreaming(false);
     } else if (inputValue.trim() && landmarkData) {
       const q = inputValue.trim();
+      setAskedQuestions(prev => new Set(prev).add(q));
       setChatMessages(prev => [...prev, { role: 'user', content: q }]);
       setInputValue('');
       startAIChat(q);
     }
   };
 
-  useEffect(() => () => { if (streamTimeoutRef.current) clearTimeout(streamTimeoutRef.current); }, []);
+  useEffect(() => () => { 
+    if (streamTimeoutRef.current) clearTimeout(streamTimeoutRef.current); 
+  }, []);
 
-  // Icons (same as before)
-  const BackIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-    </svg>
-  );
-  
-  const SendIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500 rotate-90" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-    </svg>
-  );
-  
-  const StopIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" viewBox="0 0 24 24" fill="currentColor">
-      <rect x="6" y="6" width="12" height="12" rx="2" ry="2" />
-    </svg>
-  );
-  
-  const MicIcon: React.FC = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 1a3 3 0 00-3 3v7a3 3 0 006 0V4a3 3 0 00-3-3z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 10a7 7 0 01-14 0" />
-      <line strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" x1="12" y1="18" x2="12" y2="23" />
-      <line strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" x1="8" y1="23" x2="16" y2="23" />
-    </svg>
-  );
+  // Filter out already asked follow-up questions
+  const availableFollowUps = landmarkData?.followUps.filter(
+    fu => !askedQuestions.has(fu.q)
+  ) || [];
 
   return (
-    <div className="flex flex-col h-screen bg-white">
-      <div className="flex items-center justify-between px-4 py-2 border-b">
-        <button onClick={onBack} className="p-2">
-          <BackIcon />
+    <div className="flex flex-col h-screen w-full bg-white" style={{backgroundColor: "#fff"}}>
+      {/* Header - with X at top right instead of back arrow */}
+      <header className="flex items-center justify-center px-4 py-3 bg-white border-b border-gray-200 z-10 relative" style={{backgroundColor: "#fff"}}>
+        <h1 className="text-lg font-bold text-black" style={{fontWeight: 700, color: "#000", position: "absolute", left: "50%", transform: "translateX(-50%)"}}>
+          {landmark.name}
+        </h1>
+        <button 
+          onClick={onBack} 
+          className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors absolute right-4"
+          aria-label="Close"
+          style={{marginTop: "4px", marginRight: "4px"}}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
         </button>
-        <h2 className="text-lg font-medium">{landmark.name}</h2>
-        <div className="w-10"></div> {/* Spacer for alignment */}
-      </div>
+      </header>
       
-      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-4">
+      {/* Messages Container */}
+      <div 
+        ref={chatContainerRef}
+        className="flex-1 overflow-y-auto px-6 py-6 space-y-6 bg-white" 
+        style={{backgroundColor: "#fff", overflowY: "auto"}}
+      >
         {chatMessages.map((msg, i) => (
-          <div key={i} className={`max-w-[75%] px-4 py-2 rounded-lg ${
-            msg.role === 'assistant' ? 'bg-gray-100 self-start' : 'bg-blue-500 text-white self-end'
-          }`}>
-            {msg.content}
+          <div 
+            key={i} 
+            className={`flex ${msg.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
+            style={{marginBottom: "16px"}}
+          >
+            <div 
+              className={`max-w-[85%] rounded-[20px] ${
+                msg.role === 'assistant' 
+                  ? 'bg-blue-100 text-blue-900 rounded-tl-sm' 
+                  : 'bg-[#0B5CD5] text-white rounded-tr-sm'
+              }`}
+              style={{
+                backgroundColor: msg.role === 'assistant' ? "#EBF2FE" : "#0B5CD5", 
+                color: msg.role === 'assistant' ? "#1e3a8a" : "#ffffff",
+                padding: "16px 20px",
+                marginLeft: msg.role === 'assistant' ? "4px" : "auto",
+                marginRight: msg.role === 'assistant' ? "auto" : "4px"
+              }}
+            >
+              <p className="text-[16px] leading-[24px]" style={{fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"}}>
+                {msg.content}
+              </p>
+            </div>
           </div>
         ))}
-        <div ref={messagesEndRef} /> {/* Empty div for scrolling to bottom */}
+        <div ref={messagesEndRef} className="h-4" />
       </div>
       
-      {landmarkData && (
-        <div className="px-4 py-2 border-t">
-          <div className="flex space-x-2 overflow-x-auto py-1">
-            {landmarkData.followUps.map((fu, idx) => (
-              <button 
-                key={idx} 
-                onClick={() => handleFollowUp(fu.q)} 
-                disabled={isStreaming}
-                className="flex-shrink-0 h-8 flex items-center px-3 bg-gray-200 rounded-full text-sm whitespace-nowrap hover:bg-gray-300"
-              >
-                {fu.q}
-              </button>
-            ))}
+      {/* Quick Reply Buttons - only show if there are available follow-ups */}
+      {availableFollowUps.length > 0 && (
+        <div className="px-4 py-4 border-t border-gray-200 bg-white" style={{backgroundColor: "#fff"}}>
+          <div className="overflow-x-auto hide-scrollbar">
+            <div className="flex space-x-4 py-2 w-max">
+              {availableFollowUps.map((fu, idx) => (
+                <button 
+                  key={idx} 
+                  onClick={() => handleFollowUp(fu.q)} 
+                  disabled={isStreaming}
+                  className="flex-shrink-0 flex items-center whitespace-nowrap transition-colors disabled:opacity-50 font-medium"
+                  style={{
+                    backgroundColor: "#E6EFFD", 
+                    color: "#0B5CD5",
+                    padding: "14px 20px",
+                    borderRadius: "24px",
+                    fontSize: "15px",
+                    fontWeight: 500,
+                    minHeight: "48px"
+                  }}
+                >
+                  {fu.q}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
       
-      <div className="flex items-center space-x-2 px-4 py-2 border-t">
-        <button disabled className="p-2"><MicIcon /></button>
+      {/* Input Area - slightly shorter, more space between input and button */}
+      <div className="flex items-center px-4 py-4 border-t border-gray-200 bg-white" style={{backgroundColor: "#fff"}}>
         <input
           type="text"
           value={inputValue}
           onChange={e => setInputValue(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
           disabled={isStreaming}
-          className="flex-1 border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 border border-gray-300 rounded-full text-[16px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          style={{
+            backgroundColor: "white", 
+            color: "#374151",
+            padding: "12px 20px",
+            height: "50px", // Slightly shorter
+            fontSize: "16px"
+          }}
           placeholder="Ask about this landmark..."
         />
-        <button onClick={handleSend} className="p-2">
-          {isStreaming ? <StopIcon /> : <SendIcon />}
+        
+        <button 
+          onClick={handleSend} 
+          disabled={isStreaming && !inputValue.trim()}
+          className="flex items-center justify-center ml-4 rounded-full" // More space between input and button
+          style={{
+            backgroundColor: isStreaming ? "#ef4444" : "#0B5CD5",
+            width: "42px",
+            height: "42px"
+          }}
+          aria-label={isStreaming ? "Stop" : "Send"}
+        >
+          {isStreaming ? (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white">
+              <rect x="6" y="6" width="12" height="12" rx="2" ry="2" />
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white">
+              <path d="M2 21l21-9L2 3v7l15 2-15 2z" />
+            </svg>
+          )}
         </button>
       </div>
+      
+      {/* Global styles */}
+      <style jsx global>{`
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        
+        body, html, div {
+          background-color: inherit;
+        }
+      `}</style>
     </div>
   );
 };
