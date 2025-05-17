@@ -126,17 +126,8 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
 
   // Improved auto-scroll logic
   useEffect(() => {
-    // On input focus, scroll after a short delay
-    if (inputFocused) {
-      setTimeout(() => {
-        if (messagesEndRef.current) {
-          messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        }
-      }, 220);
-      return;
-    }
-    // While streaming or on new message, auto-scroll if user is at bottom
-    if (isUserAtBottom) {
+    // Only auto-scroll if user is at bottom or input is focused
+    if (isUserAtBottom || inputFocused) {
       if (messagesEndRef.current) {
         messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }
