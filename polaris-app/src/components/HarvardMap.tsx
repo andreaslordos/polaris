@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -11,29 +11,36 @@ const cacheOptions = {
   maxAge: 60 * 60 * 24 * 7, // Cache for one week
 };
 
-// Custom cute marker icon
-const createCuteMarker = () => {
+// Custom image marker icon
+const createImageMarker = (imageName: string) => {
   return L.divIcon({
     className: 'custom-marker',
     html: `
       <div style="
-        width: 30px;
-        height: 30px;
-        background: #FF6B6B;
+        width: 50px;
+        height: 50px;
         border-radius: 50%;
         border: 3px solid white;
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        overflow: hidden;
         display: flex;
         align-items: center;
         justify-content: center;
-        color: white;
-        font-weight: bold;
-        font-size: 16px;
-      ">📍</div>
+      ">
+        <img 
+          src="/images/thumbnails/${imageName}_thumb.png" 
+          alt="${imageName}"
+          style="
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          "
+        />
+      </div>
     `,
-    iconSize: [30, 30],
-    iconAnchor: [15, 30],
-    popupAnchor: [0, -30]
+    iconSize: [50, 50],
+    iconAnchor: [25, 25],
+    popupAnchor: [0, -25]
   });
 };
 
@@ -93,115 +100,134 @@ const LANDMARKS = [
     name: 'Harvard Yard (Overall)',
     lat: 42.373475,
     lng: -71.118210,
-    description: 'Welcome to Harvard Yard, the historic heart and oldest part of Harvard University!'
+    description: 'Welcome to Harvard Yard, the historic heart and oldest part of Harvard University!',
+    image: 'harvard_yard_overall'
   },
   {
     name: 'Old Yard',
     lat: 42.374581,
     lng: -71.117554,
-    description: 'The westernmost and most historic section of Harvard Yard'
+    description: 'The westernmost and most historic section of Harvard Yard',
+    image: 'old_yard'
   },
   {
     name: 'Tercentenary Theatre',
     lat: 42.374291,
     lng: -71.116306,
-    description: 'The central grassy area in Harvard Yard'
+    description: 'The central grassy area in Harvard Yard',
+    image: 'tercentenary_theatre'
   },
   {
     name: 'Johnston Gate',
     lat: 42.374692,
     lng: -71.11857,
-    description: 'The main entrance to Harvard Yard'
+    description: 'The main entrance to Harvard Yard',
+    image: 'johnston_gate'
   },
   {
     name: 'Massachusetts Hall',
     lat: 42.374442,
     lng: -71.118316,
-    description: 'Harvard\'s oldest standing building'
+    description: 'Harvard\'s oldest standing building',
+    image: 'massachusetts_hall'
   },
   {
     name: 'Harvard Hall',
     lat: 42.374834,
     lng: -71.118231,
-    description: 'A historic classroom building'
+    description: 'A historic classroom building',
+    image: 'harvard_hall'
   },
   {
     name: 'University Hall',
     lat: 42.374461,
     lng: -71.117083,
-    description: 'A major administrative hub'
+    description: 'A major administrative hub',
+    image: 'university_hall'
   },
   {
     name: 'John Harvard Statue',
     lat: 42.374461,
     lng: -71.117218,
-    description: 'The famous statue of John Harvard'
+    description: 'The famous statue of John Harvard',
+    image: 'john_harvard_statue'
   },
   {
     name: 'Widener Library',
     lat: 42.373637,
     lng: -71.116430,
-    description: 'Harvard\'s flagship library'
+    description: 'Harvard\'s flagship library',
+    image: 'widener_library'
   },
   {
     name: 'Memorial Church',
     lat: 42.374905,
     lng: -71.116043,
-    description: 'The spiritual center of Harvard'
+    description: 'The spiritual center of Harvard',
+    image: 'memorial_church'
   },
   {
     name: 'Sever Hall',
     lat: 42.374366,
     lng: -71.115507,
-    description: 'A classroom building with unique architecture'
+    description: 'A classroom building with unique architecture',
+    image: 'sever_hall'
   },
   {
     name: 'Wadsworth House',
     lat: 42.373391,
     lng: -71.118127,
-    description: 'One of the oldest structures on campus'
+    description: 'One of the oldest structures on campus',
+    image: 'wadsworth_house'
   },
   {
     name: 'Weld Hall',
     lat: 42.373930,
     lng: -71.117125,
-    description: 'A historic freshman dormitory'
+    description: 'A historic freshman dormitory',
+    image: 'weld_hall'
   },
   {
     name: 'Matthews Hall',
     lat: 42.374097,
     lng: -71.118166,
-    description: 'Another freshman dormitory in the Old Yard'
+    description: 'Another freshman dormitory in the Old Yard',
+    image: 'matthews_hall'
   },
   {
     name: 'Straus Hall',
     lat: 42.374172,
     lng: -71.118608,
-    description: 'A dormitory in Harvard Yard'
+    description: 'A dormitory in Harvard Yard',
+    image: 'straus_hall'
   },
   {
     name: 'Grays Hall',
     lat: 42.373646,
     lng: -71.117822,
-    description: 'A historic freshman dormitory'
+    description: 'A historic freshman dormitory',
+    image: 'grays_hall'
   },
   {
     name: 'Holworthy Hall',
     lat: 42.375523,
     lng: -71.117219,
-    description: 'The northernmost of the old dormitories'
+    description: 'The northernmost of the old dormitories',
+    image: 'holworthy_hall'
   },
   {
     name: 'Holden Chapel',
     lat: 42.375271,
     lng: -71.118123,
-    description: 'The third oldest building at Harvard'
+    description: 'The third oldest building at Harvard',
+    image: 'holden_chapel'
   },
   {
     name: 'Phillips Brooks House',
     lat: 42.375653,
     lng: -71.117943,
-    description: 'Home to student community service programs'
+    description: 'Home to student community service programs',
+    image: 'phillips_brooks_house'
   }
 ];
 
@@ -331,8 +357,10 @@ export default function HarvardMap() {
         style={{ height: '100%', width: '100%' }}
         maxBounds={HARVARD_BOUNDS}
         maxBoundsViscosity={1.0}
+        zoomControl={false}
       >
         <MapDebug />
+        <ZoomControl position="bottomright" />
         <TileLayer
           url={TILE_LAYER_URL}
           {...tileLayerOptions}
@@ -342,7 +370,7 @@ export default function HarvardMap() {
           <Marker
             key={index}
             position={[landmark.lat, landmark.lng]}
-            icon={createCuteMarker()}
+            icon={createImageMarker(landmark.image)}
           >
             <Popup>
               <div className="p-2 bg-white rounded-lg shadow-lg">
