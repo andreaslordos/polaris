@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -28,6 +28,25 @@ const createCuteMarker = () => {
     iconSize: [30, 30],
     iconAnchor: [15, 30],
     popupAnchor: [0, -30]
+  });
+};
+
+// Custom blue dot marker for user location
+const createUserLocationMarker = () => {
+  return L.divIcon({
+    className: 'user-location-marker',
+    html: `
+      <div style="
+        width: 15px;
+        height: 15px;
+        background: #2196F3;
+        border-radius: 50%;
+        border: 3px solid white;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      "></div>
+    `,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
   });
 };
 
@@ -73,6 +92,55 @@ function MapDebug() {
   return null;
 }
 
+// User location component
+function UserLocation() {
+  const map = useMap();
+  const [position, setPosition] = useState<[number, number] | null>(null);
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      console.error('Geolocation is not supported by your browser');
+      return;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords;
+        setPosition([latitude, longitude]);
+        
+        // Smoothly pan to user location when first acquired
+        if (!position) {
+          map.flyTo([latitude, longitude], map.getZoom(), {
+            duration: 1.5,
+          });
+        }
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 5000,
+      }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, [map, position]);
+
+  if (!position) return null;
+
+  return (
+    <Marker
+      position={position}
+      icon={createUserLocationMarker()}
+    >
+    </Marker>
+  );
+}
+
 export default function HarvardMap() {
   const mapRef = useRef(null);
 
@@ -104,6 +172,7 @@ export default function HarvardMap() {
         <TileLayer
           url={`https://api.maptiler.com/maps/aquarelle/{z}/{x}/{y}.png?key=${process.env.NEXT_PUBLIC_MAPTILER_API_KEY}`}
         />
+        <UserLocation />
         {LANDMARKS.map((landmark, index) => (
           <Marker
             key={index}
