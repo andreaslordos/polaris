@@ -70,22 +70,27 @@ const HARVARD_BOUNDS = L.latLngBounds(
 );
 
 // Custom tile layer with caching
-const TILE_LAYER_URL = `https://api.maptiler.com/maps/aquarelle/{z}/{x}/{y}.png?key=${process.env.NEXT_PUBLIC_MAPTILER_API_KEY}`;
+const TILE_LAYER_URL = '/map-tiles/{z}/{x}/{y}.png';
 
 // Handler to add cache-control headers
 const tileLayerOptions = {
-  maxZoom: 19,
+  maxZoom: 18,
   minZoom: 14,
   tileSize: 256,
   zoomOffset: 0,
   crossOrigin: true,
   bounds: HARVARD_BOUNDS,
-  subdomains: '1234',
   attributionControl: false,
   detectRetina: true,
   updateWhenIdle: true,
   updateWhenZooming: false,
-  keepBuffer: 2,
+  keepBuffer: 4,
+  // Add loading priority
+  loadingPriority: 1,
+  // Add error handling
+  errorTileUrl: '/images/error-tile.png',
+  // Add loading indicator
+  loading: true,
 };
 
 // Sample landmarks in Harvard Yard
@@ -275,24 +280,29 @@ function UserLocation() {
 export default function HarvardMap() {
   const mapRef = useRef(null);
   const [isOffline, setIsOffline] = useState(false);
-  const [isTileCached, setIsTileCached] = useState(false);
+  const [tilesLoaded, setTilesLoaded] = useState(false);
 
-  // Monitor online/offline status
   useEffect(() => {
+    // Check if we're offline
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
-    // Check if any tiles are cached
-    if ('caches' in window) {
-      caches.open('polaris-map-tiles-v1').then(cache => {
-        cache.keys().then(keys => {
-          setIsTileCached(keys.length > 0);
-        });
-      });
-    }
+
+    // Preload tiles
+    const preloadTiles = async () => {
+      try {
+        const response = await fetch('/map-tiles/14/0/0.png');
+        if (response.ok) {
+          setTilesLoaded(true);
+        }
+      } catch (error) {
+        console.error('Failed to preload tiles:', error);
+      }
+    };
+
+    preloadTiles();
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -317,12 +327,12 @@ export default function HarvardMap() {
 
   return (
     <div className="map-container relative">
-      {isOffline && !isTileCached && (
+      {isOffline && !tilesLoaded && (
         <div className="absolute top-0 left-0 right-0 z-50 bg-yellow-500 text-white p-2 text-center">
           You're offline. Map tiles may not load properly if not previously cached.
         </div>
       )}
-      {isOffline && isTileCached && (
+      {isOffline && tilesLoaded && (
         <div className="absolute top-0 left-0 right-0 z-50 bg-green-500 text-white p-2 text-center">
           Using cached map tiles in offline mode.
         </div>
