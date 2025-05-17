@@ -59,6 +59,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   });
   const [isMounted, setIsMounted] = useState(true);
   const pendingAudioRef = useRef<{ text: string; controller: AbortController } | null>(null);
+  const [initialDescriptionStreamed, setInitialDescriptionStreamed] = useState(false);
 
   // Helper function to stop current audio playback and pending TTS request
   const stopCurrentAudioAndPendingTTS = () => {
@@ -332,14 +333,6 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
     }, 30);
   };
 
-  // Add useEffect to handle initial description
-  useEffect(() => {
-    if (landmarkData && chatMessages.length === 0) {
-      console.log('Initial description triggered');
-      streamDescription(landmarkData.twoMinDescription);
-    }
-  }, [landmarkData, chatMessages.length]);
-
   // Modify startAIChat to include audio
   const startAIChat = async (question: string) => {
     if (isStreaming) {
@@ -461,6 +454,48 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
     onBack();
   };
 
+  const playInitialDescription = () => {
+    if (landmarkData && !isStreaming) {
+      console.log('Play Introduction button clicked');
+      // Stream description text to chat if not already done or if chat is empty
+      // This ensures text appears even if audio is replayed or was interrupted.
+      if (!initialDescriptionStreamed || chatMessages.length === 0) {
+        currentTextRef.current = ''; // Reset current text for streaming
+        let position = 0;
+        const fullText = landmarkData.twoMinDescription;
+        const fullTextLength = fullText.length;
+
+        // Set up a temporary interval to stream text if not already streaming
+        // This part is a simplified version of streamDescription's text streaming logic
+        // and is primarily for ensuring the text appears. playAudio will handle the audio.
+        const textStreamInterval = setInterval(() => {
+          currentTextRef.current += fullText[position];
+          position++;
+          setChatMessages(prev => {
+            if (prev.length === 0 || prev[prev.length - 1].role !== 'assistant' || prev[prev.length - 1].content !== currentTextRef.current.slice(0, -1)) {
+               // If last message is not the one we are building or doesn't exist, add new.
+              return [...prev.filter(m => m.content !== landmarkData.twoMinDescription), { role: 'assistant', content: currentTextRef.current }];
+            }
+            const updated = [...prev];
+            updated[updated.length - 1] = {
+              role: 'assistant',
+              content: currentTextRef.current
+            };
+            return updated;
+          });
+          if (position >= fullTextLength) {
+            clearInterval(textStreamInterval);
+            setInitialDescriptionStreamed(true); 
+            // Note: isStreaming state related to audio playback is handled by playAudio/streamDescription
+          }
+        }, 30); // Standard streaming speed
+      }
+      // Call playAudio directly, as streamDescription also sets isStreaming, which might conflict
+      // if we are just replaying.
+      playAudio(landmarkData.twoMinDescription);
+    }
+  };
+
   return (
     <div className="flex flex-col w-full bg-white" style={{backgroundColor: "#fff", height: "100%"}}>
       {/* Header - Fixed positioning and proper layout */}
@@ -483,6 +518,19 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
           </button>
         </div>
       </header>
+      
+      {/* Button to play initial description */}
+      {landmarkData && !initialDescriptionStreamed && chatMessages.length === 0 && (
+        <div className="px-6 pt-4 pb-2 flex justify-center">
+          <button
+            onClick={playInitialDescription}
+            disabled={isStreaming}
+            className="px-4 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors disabled:bg-gray-400"
+          >
+            Play Introduction
+          </button>
+        </div>
+      )}
       
       {/* Messages Container */}
       <div 
