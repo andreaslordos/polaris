@@ -5,6 +5,12 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
+// Force the browser to cache tiles
+const cacheOptions = {
+  crossOrigin: true,
+  maxAge: 60 * 60 * 24 * 7, // Cache for one week
+};
+
 // Custom cute marker icon
 const createCuteMarker = () => {
   return L.divIcon({
@@ -58,12 +64,28 @@ const HARVARD_YARD = {
 
 // Harvard Square bounding box
 const HARVARD_BOUNDS = L.latLngBounds(
-  [42.346177, -71.135884], // Southwest corner
-  [42.392885, -71.109761]  // Northeast corner
+  [42.346177, -71.135884], // NW corner
+  [42.392885, -71.109761]  // SE corner
 );
 
 // Custom tile layer with caching
 const TILE_LAYER_URL = `https://api.maptiler.com/maps/aquarelle/{z}/{x}/{y}.png?key=${process.env.NEXT_PUBLIC_MAPTILER_API_KEY}`;
+
+// Handler to add cache-control headers
+const tileLayerOptions = {
+  maxZoom: 19,
+  minZoom: 14,
+  tileSize: 256,
+  zoomOffset: 0,
+  crossOrigin: true,
+  bounds: HARVARD_BOUNDS,
+  subdomains: '1234',
+  attributionControl: false,
+  detectRetina: true,
+  updateWhenIdle: true,
+  updateWhenZooming: false,
+  keepBuffer: 2,
+};
 
 // Sample landmarks in Harvard Yard
 const LANDMARKS = [
@@ -152,6 +174,31 @@ function UserLocation() {
 
 export default function HarvardMap() {
   const mapRef = useRef(null);
+  const [isOffline, setIsOffline] = useState(false);
+  const [isTileCached, setIsTileCached] = useState(false);
+
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Check if any tiles are cached
+    if ('caches' in window) {
+      caches.open('polaris-map-tiles-v1').then(cache => {
+        cache.keys().then(keys => {
+          setIsTileCached(keys.length > 0);
+        });
+      });
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     // Force a re-render of the map when the component mounts
@@ -169,7 +216,17 @@ export default function HarvardMap() {
   }, []);
 
   return (
-    <div className="map-container">
+    <div className="map-container relative">
+      {isOffline && !isTileCached && (
+        <div className="absolute top-0 left-0 right-0 z-50 bg-yellow-500 text-white p-2 text-center">
+          You're offline. Map tiles may not load properly if not previously cached.
+        </div>
+      )}
+      {isOffline && isTileCached && (
+        <div className="absolute top-0 left-0 right-0 z-50 bg-green-500 text-white p-2 text-center">
+          Using cached map tiles in offline mode.
+        </div>
+      )}
       <MapContainer
         ref={mapRef}
         center={[HARVARD_YARD.lat, HARVARD_YARD.lng]}
@@ -182,12 +239,7 @@ export default function HarvardMap() {
         <MapDebug />
         <TileLayer
           url={TILE_LAYER_URL}
-          maxZoom={19}
-          minZoom={14} // Increased minimum zoom to keep focus on Harvard Square
-          tileSize={256}
-          zoomOffset={0}
-          crossOrigin={true}
-          bounds={HARVARD_BOUNDS}
+          {...tileLayerOptions}
         />
         <UserLocation />
         {LANDMARKS.map((landmark, index) => (
