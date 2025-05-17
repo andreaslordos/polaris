@@ -392,10 +392,10 @@ export default function HarvardMap() {
           Using cached map tiles in offline mode.
         </div>
       )}
-      <div className="bg-black text-white h-16 flex items-center justify-center">
+      <div className="bg-black text-white h-10 flex items-center justify-center">
         <h1 className="text-2xl font-extrabold tracking-wide">POLARIS</h1>
       </div>
-      <div className="flex-1">
+      <div className="flex-1 relative">
         <MapContainer
           ref={mapRef}
           center={[HARVARD_YARD.lat, HARVARD_YARD.lng]}
@@ -431,6 +431,12 @@ export default function HarvardMap() {
             </Marker>
           ))}
         </MapContainer>
+        <a 
+          href="sms:+18574458893?body=Hi%20Andreas%2C%20this%20is%20about%20Polaris. "
+          className="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-400 hover:text-white transition-colors bg-black/50 px-2 py-1 rounded"
+        >
+          feedback
+        </a>
       </div>
     </div>
   );
