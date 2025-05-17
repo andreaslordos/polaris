@@ -20,7 +20,7 @@ interface ChatMessage {
 }
 
 interface ChatViewProps {
-  landmark: { name: string };
+  landmark: { name: string; image: string };
   onBack: () => void;
 }
 
@@ -60,6 +60,9 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   const [isMounted, setIsMounted] = useState(true);
   const pendingAudioRef = useRef<{ text: string; controller: AbortController } | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [inputFocused, setInputFocused] = useState(false);
+  const [isUserAtBottom, setIsUserAtBottom] = useState(true);
+  const wasAtBottomRef = useRef(true);
 
   // Helper function to stop current audio playback and pending TTS request
   const stopCurrentAudioAndPendingTTS = () => {
@@ -84,30 +87,53 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
     }
   };
 
-  // Check if user is at bottom of chat
+  // Enhanced scroll event handler
   const checkIfAtBottom = () => {
     if (chatContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-      const isBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 10;
-      setIsAtBottom(isBottom);
+      const atBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 40;
+      setIsUserAtBottom(atBottom);
+      wasAtBottomRef.current = atBottom;
     }
   };
 
-  // Scroll to bottom when messages change, but only if user was at bottom
-  useEffect(() => {
-    if (chatContainerRef.current && isAtBottom) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [chatMessages, isAtBottom]);
-
-  // Add scroll event listener
+  // Attach scroll event
   useEffect(() => {
     const container = chatContainerRef.current;
     if (container) {
       container.addEventListener('scroll', checkIfAtBottom);
+      // Initial check
+      checkIfAtBottom();
       return () => container.removeEventListener('scroll', checkIfAtBottom);
     }
   }, []);
+
+  // Track if user was at bottom before new messages
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+      wasAtBottomRef.current = Math.abs(scrollHeight - clientHeight - scrollTop) < 40;
+    }
+  }, [chatMessages.length]);
+
+  // Improved auto-scroll logic
+  useEffect(() => {
+    // On input focus, scroll after a short delay
+    if (inputFocused) {
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+      }, 220);
+      return;
+    }
+    // While streaming or on new message, auto-scroll if user is at bottom
+    if (isUserAtBottom) {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    }
+  }, [chatMessages, inputFocused, isStreaming, isUserAtBottom]);
 
   useEffect(() => {
     // Don't reset chat messages to preserve history
@@ -478,7 +504,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   return (
     <div className="flex flex-col w-full bg-white" style={{backgroundColor: "#fff", height: "100%"}}>
       {/* Header - Fixed positioning and proper layout */}
-      <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 z-10 sticky top-0" style={{backgroundColor: "#fff"}}>
+      <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 z-10 sticky top-0" style={{backgroundColor: "#fff", paddingTop: 16, paddingBottom: 8}}>
         <div className="flex-1 flex justify-start" style={{paddingLeft: "16px"}}>
           <button
             onClick={handleMuteToggle}
@@ -521,10 +547,19 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       {/* Messages Container */}
       <div 
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto px-6 py-6 space-y-6 bg-white" 
-        style={{backgroundColor: "#fff", overflowY: "auto"}}
+        className="flex-1 min-h-0 overflow-y-auto px-6 py-6 space-y-6 bg-white" 
+        style={{
+          backgroundColor: "#fff",
+          overflowY: "auto",
+          paddingBottom: inputFocused ? 120 : 32, // extra space for keyboard/suggestions
+          paddingTop: 24 // extra space below header
+        }}
         onScroll={checkIfAtBottom}
       >
+        {/* Landmark Image */}
+        <div className="flex justify-center mb-6 mt-4">
+          <img src={`/images/${landmark.image}.jpg`} alt={landmark.name} className="max-w-full h-auto rounded-xl" />
+        </div>
         {chatMessages.map((msg, i) => (
           <div 
             key={i} 
@@ -553,9 +588,8 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
         ))}
         <div ref={messagesEndRef} className="h-4" />
       </div>
-      
       {/* Footer Container - Sticky */}
-      <div className="sticky bottom-0 z-10 bg-white" style={{ bottom: 'env(safe-area-inset-bottom, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div className="sticky bottom-0 z-10 bg-white" style={{ bottom: 'env(safe-area-inset-bottom, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)', paddingTop: 12 }}>
         {/* Quick Reply Buttons - only show if there are available follow-ups */}
         {availableFollowUps.length > 0 && (
           <div className="px-4 py-4 border-t border-gray-200" style={{padding: "32px 24px"}}>
@@ -585,7 +619,6 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
             </div>
           </div>
         )}
-        
         {/* Input Area */}
         <div className="flex items-center px-4 py-4 border-t border-gray-200">
           <input
@@ -603,8 +636,9 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
               fontSize: "16px"
             }}
             placeholder="Ask about this landmark..."
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
           />
-          
           <button 
             onClick={handleSend} 
             disabled={!isStreaming && !inputValue.trim()}
@@ -628,17 +662,14 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
           </button>
         </div>
       </div>
-      
       <style jsx global>{`
         .hide-scrollbar {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
-        
         .hide-scrollbar::-webkit-scrollbar {
           display: none;
         }
-        
         body, html, div {
           background-color: inherit;
         }
