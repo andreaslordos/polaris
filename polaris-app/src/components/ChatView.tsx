@@ -313,7 +313,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
           <div 
             key={i} 
             className={`flex ${msg.role === 'assistant' ? 'justify-start' : 'justify-end'}`}
-            style={{marginBottom: "16px"}}
+            style={{marginBottom: "16px", marginTop: i === 0 ? "24px" : "0"}}
           >
             <div 
               className={`max-w-[85%] rounded-[20px] ${
@@ -340,9 +340,9 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       
       {/* Quick Reply Buttons - only show if there are available follow-ups */}
       {availableFollowUps.length > 0 && (
-        <div className="px-4 py-4 border-t border-gray-200 bg-white" style={{backgroundColor: "#fff"}}>
+        <div className="px-4 py-4 border-t border-gray-200 bg-white" style={{backgroundColor: "#fff", padding: "32px 24px"}}>
           <div className="overflow-x-auto hide-scrollbar">
-            <div className="flex space-x-4 py-2 w-max">
+            <div className="flex space-x-8 py-2 w-max">
               {availableFollowUps.map((fu, idx) => (
                 <button 
                   key={idx} 
@@ -356,7 +356,8 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
                     borderRadius: "24px",
                     fontSize: "15px",
                     fontWeight: 500,
-                    minHeight: "48px"
+                    minHeight: "48px",
+                    marginRight: "16px"
                   }}
                 >
                   {fu.q}
