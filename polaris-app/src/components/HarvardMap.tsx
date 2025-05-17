@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import ChatModal from './ChatModal';
 
 // Custom image marker icon
 const createImageMarker = (imageName: string) => {
@@ -155,7 +156,7 @@ const LANDMARKS = [
     name: 'Widener Library',
     lat: 42.373637,
     lng: -71.116430,
-    description: 'Harvard&apos;s flagship library',
+    description: 'Harvard\'s flagship library',
     image: 'widener_library'
   },
   {
@@ -281,6 +282,8 @@ export default function HarvardMap() {
   const mapRef = useRef(null);
   const [isOffline, setIsOffline] = useState(false);
   const [tilesLoaded, setTilesLoaded] = useState(false);
+  const [selectedLandmark, setSelectedLandmark] = useState<any | null>(null);
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
 
   useEffect(() => {
     // Check if we're offline
@@ -325,8 +328,14 @@ export default function HarvardMap() {
     }
   }, []);
 
+  const handleMarkerClick = (landmark: any) => {
+    setSelectedLandmark(landmark);
+    setIsChatModalOpen(true);
+    console.log("Selected landmark:", landmark);
+  };
+
   return (
-    <div className="map-container relative">
+    <div className="map-container relative h-screen w-screen">
       {isOffline && !tilesLoaded && (
         <div className="absolute top-0 left-0 right-0 z-50 bg-yellow-500 text-white p-2 text-center">
           You're offline. Map tiles may not load properly if not previously cached.
@@ -359,6 +368,11 @@ export default function HarvardMap() {
             key={index}
             position={[landmark.lat, landmark.lng]}
             icon={createImageMarker(landmark.image)}
+            eventHandlers={{
+              click: () => {
+                handleMarkerClick(landmark);
+              },
+            }}
           >
             <Popup>
               <div className="p-2 bg-white rounded-lg shadow-lg">
@@ -369,6 +383,13 @@ export default function HarvardMap() {
           </Marker>
         ))}
       </MapContainer>
+      {isChatModalOpen && selectedLandmark && (
+        <ChatModal
+          landmark={selectedLandmark}
+          isOpen={isChatModalOpen}
+          onClose={() => setIsChatModalOpen(false)}
+        />
+      )}
     </div>
   );
 } 
