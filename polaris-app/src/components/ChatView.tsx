@@ -466,7 +466,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       {/* Header - Fixed positioning and proper layout */}
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 z-10 sticky top-0" style={{backgroundColor: "#fff"}}>
         <div className="flex-1" /> {/* Spacer */}
-        <h1 className="text-sm font-bold text-black flex-1 text-center whitespace-nowrap px-2" style={{fontWeight: 500, color: "#000"}}>
+        <h1 className="font-light text-black flex-1 text-center whitespace-nowrap px-2" style={{fontSize: '24px', color: "#000", letterSpacing: "0.5px"}}>
           {landmark.name}
         </h1>
         <div className="flex-1 flex justify-end" style={{paddingRight: "16px"}}> {/* Right-aligned container */}
@@ -571,7 +571,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
         
         <button 
           onClick={handleSend} 
-          disabled={isStreaming && !inputValue.trim()}
+          disabled={!isStreaming && !inputValue.trim()}
           className="flex items-center justify-center ml-4 rounded-full" 
           style={{
             backgroundColor: isStreaming ? "#ef4444" : "#0B5CD5",
