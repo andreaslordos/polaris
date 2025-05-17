@@ -56,6 +56,15 @@ const HARVARD_YARD = {
   lng: -71.1167,
 };
 
+// Harvard Square bounding box
+const HARVARD_BOUNDS = L.latLngBounds(
+  [42.346177, -71.135884], // Southwest corner
+  [42.392885, -71.109761]  // Northeast corner
+);
+
+// Custom tile layer with caching
+const TILE_LAYER_URL = `https://api.maptiler.com/maps/aquarelle/{z}/{x}/{y}.png?key=${process.env.NEXT_PUBLIC_MAPTILER_API_KEY}`;
+
 // Sample landmarks in Harvard Yard
 const LANDMARKS = [
   {
@@ -167,10 +176,18 @@ export default function HarvardMap() {
         zoom={16}
         scrollWheelZoom={true}
         style={{ height: '100%', width: '100%' }}
+        maxBounds={HARVARD_BOUNDS}
+        maxBoundsViscosity={1.0}
       >
         <MapDebug />
         <TileLayer
-          url={`https://api.maptiler.com/maps/aquarelle/{z}/{x}/{y}.png?key=${process.env.NEXT_PUBLIC_MAPTILER_API_KEY}`}
+          url={TILE_LAYER_URL}
+          maxZoom={19}
+          minZoom={14} // Increased minimum zoom to keep focus on Harvard Square
+          tileSize={256}
+          zoomOffset={0}
+          crossOrigin={true}
+          bounds={HARVARD_BOUNDS}
         />
         <UserLocation />
         {LANDMARKS.map((landmark, index) => (
