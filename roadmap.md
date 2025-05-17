@@ -24,17 +24,18 @@ Enable visitors and students to explore Harvard Yard through an intuitive, chat-
 3. **Landmark Data**  
    - Maintain a structured source of campus landmarks, including names, descriptions, images, and relevant metadata.  
    - Allow for easy expansion of the dataset.
+   - RAG data retrieval
 
-4. **AI Integration (Optional Advanced Phase)**  
+4. **AI Integration**  
    - Leverage a language model to generate or enrich responses beyond static content.  
    - Ensure responses remain accurate by grounding them with landmark data.
+   - Ignore irrelevant requests / questions. Keep aware of context.
 
 5. **User Engagement & Feedback**  
    - Offer quick-reply suggestions or buttons to guide interactions.  
-   - Collect optional feedback to inform future improvements.
 
 6. **Responsive Design**  
-   - Optimize for mobile browsers (iOS Safari, Android Chrome).  
+   - Optimize and design primarily for mobile browsers (iOS Safari, Android Chrome).  
    - Ensure touch-friendly controls, readable text, and fast load times.
 
 ---
@@ -46,23 +47,21 @@ Enable visitors and students to explore Harvard Yard through an intuitive, chat-
    - Establish environment configuration and deployment pipeline.
 
 2. **Data & Map Integration**  
-   - Define data model for landmarks.  
-   - Integrate mapping library and display basic markers.
+   - Define data model for landmarks.
+   - Integrate mapping library and display basic markers. Make sure to make the design cute and friendly.
 
 3. **Chat & Interaction Layer**  
    - Build chat UI and intent-handling logic.  
    - Connect chat actions to landmark data queries.
 
 4. **Enhanced AI Capabilities**  
-   - Add optional AI-driven responses for natural interaction.  
+   - Add AI-driven responses for natural interaction.  
    - Implement prompt engineering and data grounding.
+   - Conversational AI would be best, with voice input option (optional)
 
 5. **Deployment & Quality Assurance**  
-   - Deploy to a hosting platform with basic monitoring.  
-   - Conduct cross-browser and mobile testing.
-
-6. **Iteration & Expansion**  
-   - Expand landmark dataset and refine UX based on user feedback.  
-   - Explore additional features (voice input, AR overlays).
-
+   - Deploy to a hosting platform with basic monitoring.
+  
+6. **Iteration & Expansion**  (don't need to worry about this)
+   - Expand landmark dataset and refine UX based on user feedback.
 ---
