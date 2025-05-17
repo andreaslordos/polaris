@@ -95,6 +95,11 @@ body {
   color: white !important;
 }
 
+/* Hide Leaflet attribution */
+.leaflet-control-attribution {
+  display: none !important;
+}
+
 /* Fix for Leaflet marker icons */
 .leaflet-marker-icon {
   background: none;

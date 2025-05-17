@@ -81,9 +81,9 @@ export default function HarvardMap() {
     const map = document.querySelector('.leaflet-container');
     if (map) {
       console.log('Map container found:', map);
-      map.style.display = 'none';
+      (map as HTMLElement).style.display = 'none';
       setTimeout(() => {
-        map.style.display = 'block';
+        (map as HTMLElement).style.display = 'block';
         console.log('Map container re-rendered');
       }, 0);
     } else {
@@ -103,7 +103,6 @@ export default function HarvardMap() {
         <MapDebug />
         <TileLayer
           url={`https://api.maptiler.com/maps/aquarelle/{z}/{x}/{y}.png?key=${process.env.NEXT_PUBLIC_MAPTILER_API_KEY}`}
-          attribution='<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>'
         />
         {LANDMARKS.map((landmark, index) => (
           <Marker
