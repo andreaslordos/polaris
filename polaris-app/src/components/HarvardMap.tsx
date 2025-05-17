@@ -4,8 +4,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import ChatModal from './ChatModal';
-
+import ChatModal from './ChatModal'; // We'll rename this later
+import ChatView from './ChatView';
 // Custom image marker icon
 const createImageMarker = (imageName: string) => {
   return L.divIcon({
@@ -283,7 +283,7 @@ export default function HarvardMap() {
   const [isOffline, setIsOffline] = useState(false);
   const [tilesLoaded, setTilesLoaded] = useState(false);
   const [selectedLandmark, setSelectedLandmark] = useState<any | null>(null);
-  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [showChat, setShowChat] = useState(false); // New state to control view
 
   useEffect(() => {
     // Check if we're offline
@@ -330,10 +330,19 @@ export default function HarvardMap() {
 
   const handleMarkerClick = (landmark: any) => {
     setSelectedLandmark(landmark);
-    setIsChatModalOpen(true);
+    setShowChat(true); // Switch to chat view
     console.log("Selected landmark:", landmark);
   };
 
+  // If showing chat, don't render the map
+  if (showChat && selectedLandmark) {
+    return (
+      <ChatView 
+        landmark={selectedLandmark} 
+        onBack={() => setShowChat(false)} 
+      />
+    );
+  }
   return (
     <div className="map-container relative h-screen w-screen">
       {isOffline && !tilesLoaded && (
@@ -369,9 +378,7 @@ export default function HarvardMap() {
             position={[landmark.lat, landmark.lng]}
             icon={createImageMarker(landmark.image)}
             eventHandlers={{
-              click: () => {
-                handleMarkerClick(landmark);
-              },
+              click: () => handleMarkerClick(landmark),
             }}
           >
             <Popup>
@@ -383,13 +390,6 @@ export default function HarvardMap() {
           </Marker>
         ))}
       </MapContainer>
-      {isChatModalOpen && selectedLandmark && (
-        <ChatModal
-          landmark={selectedLandmark}
-          isOpen={isChatModalOpen}
-          onClose={() => setIsChatModalOpen(false)}
-        />
-      )}
     </div>
   );
-} 
+}

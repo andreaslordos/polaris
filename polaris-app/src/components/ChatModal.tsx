@@ -46,27 +46,34 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, landmark, onClose }) => {
     if (isOpen && landmark) {
       setChatMessages([]);
       setInputValue('');
-      fetch('/Harvard_Yard_KB_AI_Tour.csv')
-        .then(res => res.text())
+      // In ChatModal.tsx, modify the fetch call:
+        fetch('/Harvard_Yard_KB_AI_Tour.csv')
+        .then(res => {
+        if (!res.ok) {
+            console.error(`Failed to fetch CSV: ${res.status}`);
+            throw new Error(`Failed to fetch CSV: ${res.status}`);
+        }
+        return res.text();
+        })
         .then(csvText => {
-          Papa.parse<CSVRecord>(csvText, {
+        console.log("CSV data fetched successfully");
+        Papa.parse<CSVRecord>(csvText, {
             header: true,
             complete: (results) => {
-              const record = results.data.find(r => r.Name === landmark.name);
-              if (record) {
-                const data: LandmarkData = {
-                  name: record.Name,
-                  twoMinDescription: record['2MinDescription'],
-                  followUps: [
-                    { q: record.FollowUpQ1, a: record.FollowUpA1 },
-                    { q: record.FollowUpQ2, a: record.FollowUpA2 },
-                  ],
-                };
-                setLandmarkData(data);
-                streamDescription(data.twoMinDescription);
-              }
+            console.log("CSV parsed, records:", results.data.length);
+            const record = results.data.find(r => r.Name === landmark.name);
+            if (record) {
+                console.log(`Found record for ${landmark.name}`);
+                // Rest of your code...
+            } else {
+                console.error(`No record found for ${landmark.name}`);
+            }
             },
-          });
+            error: (err) => console.error("CSV parsing error:", err)
+        });
+        })
+        .catch(error => {
+        console.error("Error fetching or parsing CSV:", error);
         });
     }
   }, [isOpen, landmark]);
@@ -190,7 +197,7 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, landmark, onClose }) => {
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end">
+    <div className="fixed inset-0 z-100000 flex items-end">
       <div className={`transform ${isOpen ? 'translate-y-0' : 'translate-y-full'} transition-transform duration-300 ease-in-out w-full max-h-[95vh] bg-white rounded-t-3xl shadow-xl flex flex-col overflow-hidden`}>
         <div className="w-12 h-1 bg-gray-300 rounded-full self-center mt-2" />
         <div className="flex items-center justify-between px-4 py-2 border-b">
