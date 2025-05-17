@@ -502,7 +502,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   };
 
   return (
-    <div className="flex flex-col w-full bg-white" style={{backgroundColor: "#fff", height: "100%"}}>
+    <div className="fixed inset-0 flex flex-col w-full bg-white" style={{backgroundColor: "#fff", height: "100%"}}>
       {/* Header - Fixed positioning and proper layout */}
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 z-10 sticky top-0" style={{backgroundColor: "#fff", paddingTop: 16, paddingBottom: 8}}>
         <div className="flex-1 flex justify-start" style={{paddingLeft: "16px"}}>

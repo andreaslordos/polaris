@@ -381,7 +381,7 @@ export default function HarvardMap() {
     );
   }
   return (
-    <div className="map-container relative h-screen w-screen">
+    <div className="map-container relative h-full w-full flex flex-col">
       {isOffline && !tilesLoaded && (
         <div className="absolute top-0 left-0 right-0 z-50 bg-yellow-500 text-white p-2 text-center">
           You're offline. Map tiles may not load properly if not previously cached.
@@ -392,41 +392,46 @@ export default function HarvardMap() {
           Using cached map tiles in offline mode.
         </div>
       )}
-      <MapContainer
-        ref={mapRef}
-        center={[HARVARD_YARD.lat, HARVARD_YARD.lng]}
-        zoom={16}
-        scrollWheelZoom={true}
-        style={{ height: '100%', width: '100%' }}
-        maxBounds={HARVARD_BOUNDS}
-        maxBoundsViscosity={1.0}
-        zoomControl={false}
-      >
-        <MapDebug />
-        <ZoomControl position="bottomright" />
-        <TileLayer
-          url={TILE_LAYER_URL}
-          {...tileLayerOptions}
-        />
-        <UserLocation />
-        {LANDMARKS.map((landmark, index) => (
-          <Marker
-            key={index}
-            position={[landmark.lat, landmark.lng]}
-            icon={createImageMarker(landmark.image, clickedMarkers.has(landmark.name))}
-            eventHandlers={{
-              click: () => handleMarkerClick(landmark),
-            }}
-          >
-            <Popup>
-              <div className="p-2 bg-white rounded-lg shadow-lg">
-                <h3 className="font-bold text-lg mb-1 text-[#FF6B6B]">{landmark.name}</h3>
-                <p className="text-sm text-gray-600">{landmark.description}</p>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
+      <div className="bg-black text-white h-16 flex items-center justify-center">
+        <h1 className="text-2xl font-extrabold tracking-wide">POLARIS</h1>
+      </div>
+      <div className="flex-1">
+        <MapContainer
+          ref={mapRef}
+          center={[HARVARD_YARD.lat, HARVARD_YARD.lng]}
+          zoom={16}
+          scrollWheelZoom={true}
+          style={{ height: '100%', width: '100%' }}
+          maxBounds={HARVARD_BOUNDS}
+          maxBoundsViscosity={1.0}
+          zoomControl={false}
+        >
+          <MapDebug />
+          <ZoomControl position="bottomright" />
+          <TileLayer
+            url={TILE_LAYER_URL}
+            {...tileLayerOptions}
+          />
+          <UserLocation />
+          {LANDMARKS.map((landmark, index) => (
+            <Marker
+              key={index}
+              position={[landmark.lat, landmark.lng]}
+              icon={createImageMarker(landmark.image, clickedMarkers.has(landmark.name))}
+              eventHandlers={{
+                click: () => handleMarkerClick(landmark),
+              }}
+            >
+              <Popup>
+                <div className="p-2 bg-white rounded-lg shadow-lg">
+                  <h3 className="font-bold text-lg mb-1 text-[#FF6B6B]">{landmark.name}</h3>
+                  <p className="text-sm text-gray-600">{landmark.description}</p>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+      </div>
     </div>
   );
 }
