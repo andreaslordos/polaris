@@ -90,23 +90,119 @@ const tileLayerOptions = {
 // Sample landmarks in Harvard Yard
 const LANDMARKS = [
   {
+    name: 'Harvard Yard (Overall)',
+    lat: 42.373475,
+    lng: -71.118210,
+    description: 'Welcome to Harvard Yard, the historic heart and oldest part of Harvard University!'
+  },
+  {
+    name: 'Old Yard',
+    lat: 42.374581,
+    lng: -71.117554,
+    description: 'The westernmost and most historic section of Harvard Yard'
+  },
+  {
+    name: 'Tercentenary Theatre',
+    lat: 42.374291,
+    lng: -71.116306,
+    description: 'The central grassy area in Harvard Yard'
+  },
+  {
+    name: 'Johnston Gate',
+    lat: 42.374692,
+    lng: -71.11857,
+    description: 'The main entrance to Harvard Yard'
+  },
+  {
+    name: 'Massachusetts Hall',
+    lat: 42.374442,
+    lng: -71.118316,
+    description: 'Harvard\'s oldest standing building'
+  },
+  {
+    name: 'Harvard Hall',
+    lat: 42.374834,
+    lng: -71.118231,
+    description: 'A historic classroom building'
+  },
+  {
+    name: 'University Hall',
+    lat: 42.374461,
+    lng: -71.117083,
+    description: 'A major administrative hub'
+  },
+  {
     name: 'John Harvard Statue',
-    lat: 42.3744,
-    lng: -71.1167,
-    description: 'The famous statue of John Harvard, known as the "Statue of Three Lies"',
+    lat: 42.374461,
+    lng: -71.117218,
+    description: 'The famous statue of John Harvard'
   },
   {
     name: 'Widener Library',
-    lat: 42.3734,
-    lng: -71.1147,
-    description: 'Harvard\'s flagship library, one of the largest academic libraries in the world',
+    lat: 42.373637,
+    lng: -71.116430,
+    description: 'Harvard\'s flagship library'
   },
   {
     name: 'Memorial Church',
-    lat: 42.3744,
-    lng: -71.1167,
-    description: 'The University\'s spiritual center, built in memory of Harvard men who died in World War I',
+    lat: 42.374905,
+    lng: -71.116043,
+    description: 'The spiritual center of Harvard'
   },
+  {
+    name: 'Sever Hall',
+    lat: 42.374366,
+    lng: -71.115507,
+    description: 'A classroom building with unique architecture'
+  },
+  {
+    name: 'Wadsworth House',
+    lat: 42.373391,
+    lng: -71.118127,
+    description: 'One of the oldest structures on campus'
+  },
+  {
+    name: 'Weld Hall',
+    lat: 42.373930,
+    lng: -71.117125,
+    description: 'A historic freshman dormitory'
+  },
+  {
+    name: 'Matthews Hall',
+    lat: 42.374097,
+    lng: -71.118166,
+    description: 'Another freshman dormitory in the Old Yard'
+  },
+  {
+    name: 'Straus Hall',
+    lat: 42.374172,
+    lng: -71.118608,
+    description: 'A dormitory in Harvard Yard'
+  },
+  {
+    name: 'Grays Hall',
+    lat: 42.373646,
+    lng: -71.117822,
+    description: 'A historic freshman dormitory'
+  },
+  {
+    name: 'Holworthy Hall',
+    lat: 42.375523,
+    lng: -71.117219,
+    description: 'The northernmost of the old dormitories'
+  },
+  {
+    name: 'Holden Chapel',
+    lat: 42.375271,
+    lng: -71.118123,
+    description: 'The third oldest building at Harvard'
+  },
+  {
+    name: 'Phillips Brooks House',
+    lat: 42.375653,
+    lng: -71.117943,
+    description: 'Home to student community service programs'
+  }
 ];
 
 // Debug component to check map initialization
