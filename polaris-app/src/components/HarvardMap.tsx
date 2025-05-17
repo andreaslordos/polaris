@@ -75,7 +75,7 @@ const TILE_LAYER_URL = '/map-tiles/{z}/{x}/{y}.png';
 
 // Handler to add cache-control headers
 const tileLayerOptions = {
-  maxZoom: 18,
+  maxZoom: 19,
   minZoom: 14,
   tileSize: 256,
   zoomOffset: 0,

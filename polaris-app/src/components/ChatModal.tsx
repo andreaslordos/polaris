@@ -69,7 +69,7 @@ const ChatModal: React.FC<ChatModalProps> = ({ isOpen, landmark, onClose }) => {
                 console.error(`No record found for ${landmark.name}`);
             }
             },
-            error: (err) => console.error("CSV parsing error:", err)
+            error: (err: Error) => console.error("CSV parsing error:", err)
         });
         })
         .catch(error => {

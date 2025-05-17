@@ -4,6 +4,7 @@ const https = require('https');
 const { promisify } = require('util');
 const mkdir = promisify(fs.mkdir);
 const writeFile = promisify(fs.writeFile);
+const access = promisify(fs.access);
 
 const MAPTILER_API_KEY = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
 if (!MAPTILER_API_KEY) {
@@ -18,7 +19,7 @@ const HARVARD_BOUNDS = {
 
 // Rate limiting
 const RATE_LIMIT = {
-  requestsPerSecond: 2,
+  requestsPerSecond: 1,
   lastRequestTime: 0
 };
 
@@ -36,8 +37,24 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Check if tile exists
+async function tileExists(z, x, y) {
+  const filePath = path.join(__dirname, '../public/map-tiles', z.toString(), x.toString(), `${y}.png`);
+  try {
+    await access(filePath, fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Download a single tile with rate limiting
 async function downloadTile(z, x, y) {
+  // Check if tile already exists
+  if (await tileExists(z, x, y)) {
+    return Promise.resolve(); // Skip if exists
+  }
+
   const url = `https://api.maptiler.com/maps/aquarelle/${z}/${x}/${y}.png?key=${MAPTILER_API_KEY}`;
   const dir = path.join(__dirname, '../public/map-tiles', z.toString(), x.toString());
   const filePath = path.join(dir, `${y}.png`);
@@ -80,9 +97,10 @@ async function downloadTilesForZoom(zoom) {
 
   console.log(`Downloading tiles for zoom level ${zoom}...`);
   
-  const BATCH_SIZE = 4;
+  const BATCH_SIZE = 2;
   const totalTiles = (seTile.x - nwTile.x + 1) * (nwTile.y - seTile.y + 1);
   let downloadedTiles = 0;
+  let skippedTiles = 0;
 
   for (let x = nwTile.x; x <= seTile.x; x += BATCH_SIZE) {
     for (let y = seTile.y; y <= nwTile.y; y += BATCH_SIZE) {
@@ -96,12 +114,17 @@ async function downloadTilesForZoom(zoom) {
               .then(() => {
                 downloadedTiles++;
                 process.stdout.write('.');
-                if (downloadedTiles % 10 === 0) {
-                  process.stdout.write(` ${Math.round((downloadedTiles / totalTiles) * 100)}%\n`);
+                if ((downloadedTiles + skippedTiles) % 10 === 0) {
+                  process.stdout.write(` ${Math.round(((downloadedTiles + skippedTiles) / totalTiles) * 100)}%\n`);
                 }
               })
               .catch(error => {
-                console.error(`\nError downloading tile ${zoom}/${x + dx}/${y + dy}:`, error.message);
+                if (error.message.includes('already exists')) {
+                  skippedTiles++;
+                  process.stdout.write('s'); // 's' for skipped
+                } else {
+                  console.error(`\nError downloading tile ${zoom}/${x + dx}/${y + dy}:`, error.message);
+                }
               })
           );
         }
@@ -110,16 +133,18 @@ async function downloadTilesForZoom(zoom) {
       // Wait for batch to complete
       await Promise.all(batchPromises);
       
-      // Add a small delay between batches
-      await delay(100);
+      // Add a longer delay between batches
+      await delay(500);
     }
   }
   console.log('\n');
+  console.log(`Zoom level ${zoom} complete. Downloaded: ${downloadedTiles}, Skipped: ${skippedTiles}`);
 }
 
 // Download tiles for all zoom levels
 async function downloadAllTiles() {
-  const zoomLevels = Array.from({ length: 5 }, (_, i) => i + 14); // Zoom levels 14-18
+  // Only download zoom level 19
+  const zoomLevels = [19];
   
   for (const zoom of zoomLevels) {
     await downloadTilesForZoom(zoom);

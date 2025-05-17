@@ -106,7 +106,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
               console.error(`No record found for ${landmark.name}`);
             }
           },
-          error: (err) => console.error("CSV parsing error:", err)
+          error: (err: Error) => console.error("CSV parsing error:", err)
         });
       })
       .catch(error => {
@@ -175,6 +175,12 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
     
     // Reset current text
     currentTextRef.current = '';
+    
+    // Add user message to chat first
+    setChatMessages(prev => [...prev, { role: 'user', content: question }]);
+    
+    // Add initial empty assistant message
+    setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
     
     try {
       const res = await fetch('/api/chat', {
@@ -259,7 +265,6 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
     } else if (inputValue.trim() && landmarkData) {
       const q = inputValue.trim();
       setAskedQuestions(prev => new Set(prev).add(q));
-      setChatMessages(prev => [...prev, { role: 'user', content: q }]);
       setInputValue('');
       startAIChat(q);
     }
