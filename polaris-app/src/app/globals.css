@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  height: 100vh; /* Fallback for browsers that do not support dvh */
+  height: 100dvh;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -26,8 +31,13 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   margin: 0;
-  padding: 0;
-  height: 100vh;
+  padding: 0; /* Base padding, specific paddings below will override */
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  height: 100vh; /* Fallback for browsers that do not support dvh */
+  height: 100dvh;
   width: 100vw;
   overflow: hidden;
 }
