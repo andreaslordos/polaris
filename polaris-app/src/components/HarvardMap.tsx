@@ -12,8 +12,8 @@ const createImageMarker = (imageName: string) => {
     className: 'custom-marker',
     html: `
       <div style="
-        width: 50px;
-        height: 50px;
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
         border: 3px solid white;
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
@@ -33,8 +33,8 @@ const createImageMarker = (imageName: string) => {
         />
       </div>
     `,
-    iconSize: [50, 50],
-    iconAnchor: [25, 25],
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
     popupAnchor: [0, -25]
   });
 };
