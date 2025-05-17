@@ -6,19 +6,8 @@ const nextConfig = {
     // your project has ESLint errors.
     ignoreDuringBuilds: true,
   },
-  headers: async () => {
-    return [
-      {
-        // Apply cache headers to map tile requests
-        source: '/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-    ];
+  images: {
+    unoptimized: true, // Required for static export
   },
 };
 

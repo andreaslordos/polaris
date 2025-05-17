@@ -33,6 +33,12 @@ interface CSVRecord {
   FollowUpA2: string;
 }
 
+// Add new interfaces for audio handling
+interface AudioState {
+  isPlaying: boolean;
+  currentAudio: HTMLAudioElement | null;
+}
+
 const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   const [landmarkData, setLandmarkData] = useState<LandmarkData | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -45,6 +51,10 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const currentTextRef = useRef<string>('');
   const streamIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [audioState, setAudioState] = useState<AudioState>({
+    isPlaying: false,
+    currentAudio: null,
+  });
 
   // Check if user is at bottom of chat
   const checkIfAtBottom = () => {
@@ -114,7 +124,40 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       });
   }, [landmark.name]);
 
-  // Completely reworked streaming implementation to prevent duplicate characters
+  // Function to play audio for a given text
+  const playAudio = async (text: string) => {
+    try {
+      // Stop any currently playing audio
+      if (audioState.currentAudio) {
+        audioState.currentAudio.pause();
+        audioState.currentAudio = null;
+      }
+
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) throw new Error('Failed to generate audio');
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+
+      audio.onended = () => {
+        setAudioState({ isPlaying: false, currentAudio: null });
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      setAudioState({ isPlaying: true, currentAudio: audio });
+      await audio.play();
+    } catch (error) {
+      console.error('Error playing audio:', error);
+    }
+  };
+
+  // Modify streamDescription to include audio
   const streamDescription = (fullText: string) => {
     if (isStreaming) {
       console.log("Already streaming, ignoring request");
@@ -122,26 +165,21 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
     }
     
     setIsStreaming(true);
-    
-    // Reset the current text reference
     currentTextRef.current = '';
-    
-    // Variable to track our position in the text
     let position = 0;
     const fullTextLength = fullText.length;
     
-    // Clear any existing intervals
     if (streamIntervalRef.current) {
       clearInterval(streamIntervalRef.current);
     }
     
-    // Create a new streaming interval
+    // Start playing audio for the full text
+    playAudio(fullText);
+    
     streamIntervalRef.current = setInterval(() => {
-      // Add the next character
       currentTextRef.current += fullText[position];
       position++;
       
-      // Update or create the message with the current text
       setChatMessages(prev => {
         if (prev.length === 0 || prev[prev.length - 1].role !== 'assistant') {
           return [...prev, { role: 'assistant', content: currentTextRef.current }];
@@ -154,14 +192,14 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
         return updated;
       });
       
-      // Exit if we've reached the end of the text
       if (position >= fullTextLength) {
         clearInterval(streamIntervalRef.current!);
         setIsStreaming(false);
       }
-    }, 30); // Slightly slower for better reliability
+    }, 30);
   };
 
+  // Modify startAIChat to include audio
   const startAIChat = async (question: string) => {
     if (isStreaming) {
       console.log("Already streaming, ignoring request");
@@ -173,13 +211,8 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
     abortControllerRef.current = controller;
     const body = { landmarkName: landmarkData!.name, question, history: chatMessages };
     
-    // Reset current text
     currentTextRef.current = '';
-    
-    // Add user message to chat first
     setChatMessages(prev => [...prev, { role: 'user', content: question }]);
-    
-    // Add initial empty assistant message
     setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
     
     try {
@@ -199,6 +232,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let done = false;
+      let fullResponse = '';
       
       while (!done) {
         const { value, done: d } = await reader.read();
@@ -213,10 +247,9 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
               const parsed = JSON.parse(data);
               const txt = parsed.choices[0].delta?.content;
               if (txt) {
-                // Update our reference first
+                fullResponse += txt;
                 currentTextRef.current += txt;
                 
-                // Then update state with the complete current text
                 setChatMessages(prev => {
                   const m = [...prev];
                   m[m.length - 1] = { 
@@ -229,6 +262,11 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
             } catch {}
           }
         }
+      }
+
+      // Play audio for the complete response
+      if (fullResponse) {
+        playAudio(fullResponse);
       }
     } catch (error) {
       console.error('Error in chat API:', error);
@@ -275,6 +313,16 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
     return () => {
       if (streamIntervalRef.current) {
         clearInterval(streamIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioState.currentAudio) {
+        audioState.currentAudio.pause();
+        audioState.currentAudio = null;
       }
     };
   }, []);
