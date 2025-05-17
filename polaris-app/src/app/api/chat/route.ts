@@ -70,8 +70,14 @@ export async function POST(req: Request) {
         'Connection': 'keep-alive',
       },
     });
-  } catch (error) {
-    console.error('Chat API error:', error);
+  } catch (error: any) {
+    console.error('[Chat API] Error caught:', error);
+    if (error.response) {
+      console.error('[Chat API] OpenAI Error Response:', error.response.data);
+    }
+    if (error.message) {
+      console.error('[Chat API] Error Message:', error.message);
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

@@ -243,7 +243,16 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
         return;
       }
 
-      if (!response.ok) throw new Error('Failed to generate audio');
+      if (!response.ok) {
+        let errorData = { error: 'Failed to generate audio due to server error.' };
+        try {
+          errorData = await response.json();
+          console.error('[Audio] TTS API Error Response:', errorData);
+        } catch (e) {
+          console.error('[Audio] TTS API responded with an error, but failed to parse JSON response:', response.status, response.statusText);
+        }
+        throw new Error(errorData.error || 'Failed to generate audio');
+      }
 
       const isCached = response.headers.get('X-Cache') === 'HIT';
       console.log('[Audio] Response cache status:', isCached ? 'CACHED' : 'NEW');
@@ -307,11 +316,11 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
         console.error('[Audio] Play error:', playError);
         stopAll();
       }
-    } catch (error: unknown) {
+    } catch (error: any) { // Ensure error is typed as any or unknown
       if (error instanceof Error && error.name === 'AbortError') {
         console.log('[Audio] TTS Fetch request aborted for text:', text.substring(0, 50) + '...');
       } else {
-        console.error('[Audio] Error in playAudio for text:', text.substring(0, 50) + '...', error);
+        console.error('[Audio] Error in playAudio for text:', text.substring(0, 50) + '...', error.message || error);
       }
       // Do not call global stopAll here, just ensure local cleanup if needed.
       // stopCurrentAudioAndPendingTTS might have already been called by a subsequent playAudio call.
@@ -397,7 +406,14 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       });
       
       if (!res.ok) {
-        console.error('Chat API error');
+        let errorData = { error: 'Chat API request failed.' };
+        try {
+          errorData = await res.json();
+          console.error('[Chat] API Error Response:', errorData);
+        } catch (e) {
+          console.error('[Chat] API responded with an error, but failed to parse JSON response:', res.status, res.statusText);
+        }
+        setChatMessages(prev => [...prev, { role: 'assistant', content: `Error: ${errorData.error || 'Chat service unavailable.'}` }]);
         setIsStreaming(false);
         return;
       }
@@ -441,8 +457,14 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
       if (fullResponse) {
         playAudio(fullResponse);
       }
-    } catch (error) {
-      console.error('Error in chat API:', error);
+    } catch (error: any) { // Ensure error is typed as any or unknown
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('[Chat] API request aborted.');
+        setChatMessages(prev => [...prev, { role: 'assistant', content: 'Request cancelled.' }]);
+      } else {
+        console.error('[Chat] Error in chat API call:', error.message || error);
+        setChatMessages(prev => [...prev, { role: 'assistant', content: `Error: ${error.message || 'Could not connect to chat service.'}` }]);
+      }
     } finally {
       setIsStreaming(false);
     }
