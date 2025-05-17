@@ -40,17 +40,36 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [askedQuestions, setAskedQuestions] = useState<Set<string>>(new Set());
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const currentTextRef = useRef<string>('');
   const streamIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
+  // Check if user is at bottom of chat
+  const checkIfAtBottom = () => {
     if (chatContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+      const isBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 10;
+      setIsAtBottom(isBottom);
+    }
+  };
+
+  // Scroll to bottom when messages change, but only if user was at bottom
+  useEffect(() => {
+    if (chatContainerRef.current && isAtBottom) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [chatMessages]);
+  }, [chatMessages, isAtBottom]);
+
+  // Add scroll event listener
+  useEffect(() => {
+    const container = chatContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', checkIfAtBottom);
+      return () => container.removeEventListener('scroll', checkIfAtBottom);
+    }
+  }, []);
 
   useEffect(() => {
     // Don't reset chat messages to preserve history
@@ -288,6 +307,7 @@ const ChatView: React.FC<ChatViewProps> = ({ landmark, onBack }) => {
         ref={chatContainerRef}
         className="flex-1 overflow-y-auto px-6 py-6 space-y-6 bg-white" 
         style={{backgroundColor: "#fff", overflowY: "auto"}}
+        onScroll={checkIfAtBottom}
       >
         {chatMessages.map((msg, i) => (
           <div 
