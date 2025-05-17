@@ -4,6 +4,7 @@ import OpenAI from 'openai';
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+console.log(`[Chat API] OpenAI Key Loaded: ${process.env.OPENAI_API_KEY ? 'YES' : 'NO'}`);
 
 // System message to set context and boundaries
 const SYSTEM_MESSAGE = `You are a knowledgeable tour guide for Harvard Yard, focused on providing accurate historical and architectural information. 

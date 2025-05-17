@@ -7,6 +7,7 @@ import crypto from 'crypto';
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+console.log(`[TTS API] OpenAI Key Loaded: ${process.env.OPENAI_API_KEY ? 'YES' : 'NO'}`);
 
 // Create audio directory if it doesn't exist
 const AUDIO_DIR = path.join(process.cwd(), 'public', 'audio');
