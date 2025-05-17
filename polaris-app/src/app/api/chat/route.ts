@@ -40,11 +40,11 @@ export async function POST(req: Request) {
     ];
 
     const stream = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
+      model: "gpt-4.1-nano-2025-04-14",
       messages,
       stream: true,
-      temperature: 0.7,
-      max_tokens: 500,
+      temperature: 0.5,
+      max_tokens: 200,
     });
 
     const encoder = new TextEncoder();
