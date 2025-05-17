@@ -97,7 +97,7 @@ const tileLayerOptions = {
 // Sample landmarks in Harvard Yard
 const LANDMARKS = [
   {
-    name: 'Harvard Yard (Overall)',
+    name: 'Harvard Yard',
     lat: 42.373475,
     lng: -71.118210,
     description: 'Welcome to Harvard Yard, the historic heart and oldest part of Harvard University!',
