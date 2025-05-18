@@ -70,8 +70,8 @@ const createUserLocationMarker = () => {
 
 // Harvard Yard coordinates
 const HARVARD_YARD = {
-  lat: 42.3744,
-  lng: -71.1167,
+  lat: 42.373911,
+  lng: -71.117727,
 };
 
 // Harvard Square bounding box
@@ -108,17 +108,10 @@ const tileLayerOptions = {
 const LANDMARKS = [
   {
     name: 'Harvard Yard',
-    lat: 42.373475,
-    lng: -71.118210,
+    lat: 42.373911,
+    lng: -71.117727,
     description: 'Welcome to Harvard Yard, the historic heart and oldest part of Harvard University!',
     image: 'harvard_yard_overall'
-  },
-  {
-    name: 'Old Yard',
-    lat: 42.374581,
-    lng: -71.117554,
-    description: 'The westernmost and most historic section of Harvard Yard',
-    image: 'old_yard'
   },
   {
     name: 'Tercentenary Theatre',
@@ -138,7 +131,7 @@ const LANDMARKS = [
     name: 'Massachusetts Hall',
     lat: 42.374442,
     lng: -71.118316,
-    description: 'Harvard&apos;s oldest standing building',
+    description: 'Harvard\`s oldest standing building',
     image: 'massachusetts_hall'
   },
   {
@@ -191,53 +184,11 @@ const LANDMARKS = [
     image: 'wadsworth_house'
   },
   {
-    name: 'Weld Hall',
-    lat: 42.373930,
-    lng: -71.117125,
-    description: 'A historic freshman dormitory',
-    image: 'weld_hall'
-  },
-  {
-    name: 'Matthews Hall',
-    lat: 42.374097,
-    lng: -71.118166,
-    description: 'Another freshman dormitory in the Old Yard',
-    image: 'matthews_hall'
-  },
-  {
-    name: 'Straus Hall',
-    lat: 42.374172,
-    lng: -71.118608,
-    description: 'A dormitory in Harvard Yard',
-    image: 'straus_hall'
-  },
-  {
-    name: 'Grays Hall',
-    lat: 42.373646,
-    lng: -71.117822,
-    description: 'A historic freshman dormitory',
-    image: 'grays_hall'
-  },
-  {
-    name: 'Holworthy Hall',
-    lat: 42.375523,
-    lng: -71.117219,
-    description: 'The northernmost of the old dormitories',
-    image: 'holworthy_hall'
-  },
-  {
     name: 'Holden Chapel',
     lat: 42.375271,
     lng: -71.118123,
     description: 'The third oldest building at Harvard',
     image: 'holden_chapel'
-  },
-  {
-    name: 'Phillips Brooks House',
-    lat: 42.375653,
-    lng: -71.117943,
-    description: 'Home to student community service programs',
-    image: 'phillips_brooks_house'
   }
 ];
 
