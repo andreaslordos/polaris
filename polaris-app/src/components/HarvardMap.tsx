@@ -220,7 +220,7 @@ function MapDebug() {
   return null;
 }
 
-type MapMode = 'explorer' | 'seeAll';
+type MapMode = 'explorer' | 'atlas';
 
 // Define a more specific type for Landmark if possible
 interface Landmark {
@@ -307,17 +307,17 @@ const MemoizedLandmarkMarker: React.FC<LandmarkMarkerProps> = React.memo(({
         newBlurPx = Math.min(MAX_BLUR_PX, Math.max(0, newBlurPx));
         console.log(`[Debug ${landmark.name}] In range. Opacity: ${newOpacity.toFixed(2)}, Blur: ${newBlurPx.toFixed(1)}px. IsVisible: true`);
       }
-    } else if (mapMode === 'seeAll') {
-      console.log(`[Debug ${landmark.name}] SeeAll mode. Opacity: 1, Blur: 0, IsVisible: true`);
+    } else if (mapMode === 'atlas') {
+      console.log(`[Debug ${landmark.name}] Atlas mode. Opacity: 1, Blur: 0, IsVisible: true`);
     } else if (!userLocation && mapMode === 'explorer'){
       newIsVisible = false; // Hide if explorer mode and no user location yet
       console.log(`[Debug ${landmark.name}] Explorer mode, no user location yet. IsVisible: false`);
     }
     
     setCurrentDistance(newDistance);
-    const finalOpacity = mapMode === 'seeAll' ? 1 : newOpacity;
-    const finalBlurPx = mapMode === 'seeAll' ? 0 : newBlurPx;
-    const finalIsVisible = mapMode === 'seeAll' ? true : newIsVisible;
+    const finalOpacity = mapMode === 'atlas' ? 1 : newOpacity;
+    const finalBlurPx = mapMode === 'atlas' ? 0 : newBlurPx;
+    const finalIsVisible = mapMode === 'atlas' ? true : newIsVisible;
 
     setCurrentOpacity(finalOpacity);
     setCurrentBlurPx(finalBlurPx);
@@ -468,7 +468,7 @@ export default function HarvardMap() {
   };
 
   const toggleMapMode = () => {
-    setMapMode(prevMode => prevMode === 'explorer' ? 'seeAll' : 'explorer');
+    setMapMode(prevMode => prevMode === 'explorer' ? 'atlas' : 'explorer');
   };
 
   // If showing chat, don't render the map
@@ -495,11 +495,28 @@ export default function HarvardMap() {
       <div className="bg-black text-white h-16 flex items-center justify-between px-4">
         <h1 className="text-2xl font-extrabold tracking-wide">POLARIS</h1>
         <div className="flex items-center space-x-2">
-          <button 
+          <button
             onClick={toggleMapMode}
-            className="text-xs bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded"
+            className="relative flex items-center w-[7rem] h-7 rounded-full bg-gray-700 p-0.5 cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-opacity-50"
+            role="switch"
+            aria-checked={mapMode === 'atlas'}
+            title={`Switch to ${mapMode === 'explorer' ? 'Atlas' : 'Explorer'} Mode`}
           >
-            Mode: {mapMode === 'explorer' ? 'Explorer' : 'See All'}
+            <div
+              className={`absolute top-[2px] left-[2px] h-[calc(100%-4px)] w-[calc(50%-2px)] bg-sky-500 hover:bg-sky-400 rounded-full shadow
+                        transform transition-transform duration-300 ease-in-out
+                        ${mapMode === 'atlas' ? 'translate-x-[calc(100%+2px)]' : 'translate-x-0'}`}
+            />
+            <div className="relative z-10 flex w-full justify-between">
+              <span className={`flex-1 px-1 py-0.5 text-center text-xs font-medium transition-colors duration-300 ease-in-out
+                                ${mapMode === 'explorer' ? 'text-white' : 'text-gray-300'}`}>
+                Explorer
+              </span>
+              <span className={`flex-1 px-1 py-0.5 text-center text-xs font-medium transition-colors duration-300 ease-in-out
+                                ${mapMode === 'atlas' ? 'text-white' : 'text-gray-300'}`}>
+                Atlas
+              </span>
+            </div>
           </button>
           {mapMode === 'explorer' && (
             <div className="text-xs">
