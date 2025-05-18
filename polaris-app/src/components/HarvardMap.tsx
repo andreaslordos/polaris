@@ -320,24 +320,32 @@ const MemoizedLandmarkMarker: React.FC<LandmarkMarkerProps> = React.memo(({
     let newIsVisible = true;
 
     if (mapMode === 'explorer' && userLocation) {
-      const landmarkLatLng = L.latLng(landmark.lat, landmark.lng);
-      newDistance = haversineDistance(
-        { lat: userLocation.lat, lng: userLocation.lng },
-        { lat: landmark.lat, lng: landmark.lng }
-      );
-      
-      console.log(`[Debug ${landmark.name}] UserLoc: ${userLocation.lat},${userLocation.lng} | LandmarkLoc: ${landmark.lat},${landmark.lng} | Distance (Haversine): ${newDistance?.toFixed(1)}m`);
-
-      if (newDistance > DISCOVERY_RADIUS) {
-        newIsVisible = false;
-        console.log(`[Debug ${landmark.name}] Too far. IsVisible: false (Distance ${newDistance.toFixed(1)}m > ${DISCOVERY_RADIUS}m)`);
+      if (isClicked) {
+        // If revealed, always show at full opacity and resolution
+        newOpacity = 1;
+        newBlurPx = 0;
+        newIsVisible = true;
+        console.log(`[Debug ${landmark.name}] Revealed in explorer mode. Full opacity and resolution.`);
       } else {
-        newOpacity = MIN_OPACITY + (1 - MIN_OPACITY) * Math.max(0, (DISCOVERY_RADIUS - newDistance) / (DISCOVERY_RADIUS - INTERACTION_RADIUS));
-        newOpacity = Math.min(1, Math.max(MIN_OPACITY, newOpacity));
+        const landmarkLatLng = L.latLng(landmark.lat, landmark.lng);
+        newDistance = haversineDistance(
+          { lat: userLocation.lat, lng: userLocation.lng },
+          { lat: landmark.lat, lng: landmark.lng }
+        );
         
-        newBlurPx = MAX_BLUR_PX * Math.max(0, (newDistance - INTERACTION_RADIUS) / (DISCOVERY_RADIUS - INTERACTION_RADIUS));
-        newBlurPx = Math.min(MAX_BLUR_PX, Math.max(0, newBlurPx));
-        console.log(`[Debug ${landmark.name}] In range. Opacity: ${newOpacity.toFixed(2)}, Blur: ${newBlurPx.toFixed(1)}px. IsVisible: true`);
+        console.log(`[Debug ${landmark.name}] UserLoc: ${userLocation.lat},${userLocation.lng} | LandmarkLoc: ${landmark.lat},${landmark.lng} | Distance (Haversine): ${newDistance?.toFixed(1)}m`);
+
+        if (newDistance > DISCOVERY_RADIUS) {
+          newIsVisible = false;
+          console.log(`[Debug ${landmark.name}] Too far. IsVisible: false (Distance ${newDistance.toFixed(1)}m > ${DISCOVERY_RADIUS}m)`);
+        } else {
+          newOpacity = MIN_OPACITY + (1 - MIN_OPACITY) * Math.max(0, (DISCOVERY_RADIUS - newDistance) / (DISCOVERY_RADIUS - INTERACTION_RADIUS));
+          newOpacity = Math.min(1, Math.max(MIN_OPACITY, newOpacity));
+          
+          newBlurPx = MAX_BLUR_PX * Math.max(0, (newDistance - INTERACTION_RADIUS) / (DISCOVERY_RADIUS - INTERACTION_RADIUS));
+          newBlurPx = Math.min(MAX_BLUR_PX, Math.max(0, newBlurPx));
+          console.log(`[Debug ${landmark.name}] In range. Opacity: ${newOpacity.toFixed(2)}, Blur: ${newBlurPx.toFixed(1)}px. IsVisible: true`);
+        }
       }
     } else if (mapMode === 'atlas') {
       console.log(`[Debug ${landmark.name}] Atlas mode. Opacity: 1, Blur: 0, IsVisible: true`);
