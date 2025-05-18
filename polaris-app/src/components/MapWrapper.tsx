@@ -19,7 +19,7 @@ export default function MapWrapper() {
       </div>
       <a 
         href="sms:+18574458893?body=Hi%20Andreas%2C%20this%20is%20about%20Polaris. "
-        className="text-xs text-gray-400 hover:text-white transition-colors bg-black/50 px-2 py-1 rounded text-center w-full block"
+        className="text-xs transition-colors px-4 py-1 text-center block bg-black text-white"
         style={{ lineHeight: '2rem' }}
       >
         feedback
