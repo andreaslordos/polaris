@@ -7,8 +7,8 @@ import 'leaflet/dist/leaflet.css';
 import ChatView from './ChatView';
 
 // Gamification Constants
-const DISCOVERY_RADIUS = 25; // meters
-const INTERACTION_RADIUS = 5; // meters
+const DISCOVERY_RADIUS = 100; // meters
+const INTERACTION_RADIUS = 50; // meters
 const MIN_OPACITY = 0.2;
 const MAX_BLUR_PX = 8; // pixels
 
@@ -206,6 +206,34 @@ const LANDMARKS = [
   }
 ];
 
+// Function to calculate Haversine distance
+function haversineDistance(
+  coords1: { lat: number; lng: number },
+  coords2: { lat: number; lng: number }
+): number {
+  const toRad = (x: number) => (x * Math.PI) / 180;
+
+  const lat1 = coords1.lat;
+  const lon1 = coords1.lng;
+  const lat2 = coords2.lat;
+  const lon2 = coords2.lng;
+
+  const R = 6371000; // Earth's mean radius in meters
+
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const rLat1 = toRad(lat1);
+  const rLat2 = toRad(lat2);
+
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(rLat1) * Math.cos(rLat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+
+  return distance;
+}
+
 // Debug component to check map initialization
 function MapDebug() {
   const map = useMap();
@@ -292,9 +320,12 @@ const MemoizedLandmarkMarker: React.FC<LandmarkMarkerProps> = React.memo(({
 
     if (mapMode === 'explorer' && userLocation) {
       const landmarkLatLng = L.latLng(landmark.lat, landmark.lng);
-      newDistance = userLocation.distanceTo(landmarkLatLng);
+      newDistance = haversineDistance(
+        { lat: userLocation.lat, lng: userLocation.lng },
+        { lat: landmark.lat, lng: landmark.lng }
+      );
       
-      console.log(`[Debug ${landmark.name}] UserLoc: ${userLocation.lat},${userLocation.lng} | LandmarkLoc: ${landmark.lat},${landmark.lng} | Distance: ${newDistance?.toFixed(1)}m`);
+      console.log(`[Debug ${landmark.name}] UserLoc: ${userLocation.lat},${userLocation.lng} | LandmarkLoc: ${landmark.lat},${landmark.lng} | Distance (Haversine): ${newDistance?.toFixed(1)}m`);
 
       if (newDistance > DISCOVERY_RADIUS) {
         newIsVisible = false;
