@@ -495,9 +495,14 @@ export default function HarvardMap() {
       <div className="bg-black text-white h-16 flex items-center justify-between px-4">
         <h1 className="text-2xl font-extrabold tracking-wide">POLARIS</h1>
         <div className="flex items-center space-x-2">
+          {mapMode === 'explorer' && (
+            <div className="text-xs">
+              Found: {clickedMarkers.size} / {LANDMARKS.length}
+            </div>
+          )}
           <button
             onClick={toggleMapMode}
-            className="relative flex items-center w-[7rem] h-7 rounded-full bg-gray-700 p-0.5 cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-opacity-50"
+            className="relative flex items-center w-[7rem] h-7 rounded-full bg-gray-700 p-0.5 cursor-pointer select-none focus:outline-none"
             role="switch"
             aria-checked={mapMode === 'atlas'}
             title={`Switch to ${mapMode === 'explorer' ? 'Atlas' : 'Explorer'} Mode`}
@@ -518,21 +523,8 @@ export default function HarvardMap() {
               </span>
             </div>
           </button>
-          {mapMode === 'explorer' && (
-            <div className="text-xs">
-              Unlocked: {clickedMarkers.size} / {LANDMARKS.length}
-            </div>
-          )}
         </div>
       </div>
-      {mapMode === 'explorer' && (
-        <div className="w-full bg-gray-200 h-1">
-          <div 
-            className="bg-green-500 h-1" 
-            style={{ width: `${(clickedMarkers.size / LANDMARKS.length) * 100}%` }}
-          ></div>
-        </div>
-      )}
       <div className="flex-1 relative">
         <MapContainer
           ref={mapRef}
