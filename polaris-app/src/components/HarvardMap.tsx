@@ -5,9 +5,10 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from 'rea
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import ChatView from './ChatView';
+import IntroModal from './IntroModal';
 
 // Gamification Constants
-const DISCOVERY_RADIUS = 100; // meters
+const DISCOVERY_RADIUS = 150; // meters
 const INTERACTION_RADIUS = 50; // meters
 const MIN_OPACITY = 0.2;
 const MAX_BLUR_PX = 8; // pixels
@@ -414,6 +415,7 @@ export default function HarvardMap() {
   const [clickedMarkers, setClickedMarkers] = useState<Set<string>>(new Set());
   const [userLocation, setUserLocation] = useState<L.LatLng | null>(null);
   const [mapMode, setMapMode] = useState<MapMode>('explorer');
+  const [showIntroModal, setShowIntroModal] = useState(false);
 
   // Typed LANDMARKS constant
   const typedLandmarks: Landmark[] = LANDMARKS;
@@ -421,14 +423,20 @@ export default function HarvardMap() {
   // Load clicked markers from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const raw = window.localStorage.getItem('clickedMarkers');
-      if (raw) {
+      const rawClicked = window.localStorage.getItem('clickedMarkers');
+      if (rawClicked) {
         try {
-          const arr: string[] = JSON.parse(raw);
+          const arr: string[] = JSON.parse(rawClicked);
           setClickedMarkers(new Set(arr));
         } catch (e) {
           console.error('Failed to parse clickedMarkers from localStorage', e);
         }
+      }
+
+      // Check if intro modal has been seen
+      const hasSeenIntro = window.localStorage.getItem('hasSeenIntroModal');
+      if (!hasSeenIntro) {
+        setShowIntroModal(true);
       }
     }
   }, []);
@@ -484,6 +492,13 @@ export default function HarvardMap() {
     }
   }, []);
 
+  const handleIntroModalClose = () => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('hasSeenIntroModal', 'true');
+    }
+    setShowIntroModal(false);
+  };
+
   const handleMarkerClick = (landmark: Landmark, distance: number | null) => {
     if (mapMode === 'explorer' && userLocation && distance !== null) {
       if (distance > INTERACTION_RADIUS) {
@@ -513,6 +528,7 @@ export default function HarvardMap() {
   }
   return (
     <div className="map-container relative h-full w-full flex flex-col">
+      {showIntroModal && <IntroModal onClose={handleIntroModalClose} />}
       {isOffline && !tilesLoaded && (
         <div className="absolute top-0 left-0 right-0 z-50 bg-yellow-500 text-white p-2 text-center">
           You're offline. Map tiles may not load properly if not previously cached.
