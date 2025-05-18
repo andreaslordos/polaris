@@ -17,13 +17,12 @@ const MAX_BLUR_PX = 8; // pixels
 const createImageMarker = (
   imageName: string, 
   isClicked: boolean = false,
-  opacity: number = 1,
-  blurPx: number = 0
+  markerId: string
 ) => {
   return L.divIcon({
     className: 'custom-marker',
     html: `
-      <div style="
+      <div data-marker-id="${markerId}" class="custom-marker-inner" style="
         position: relative;
         width: 40px;
         height: 40px;
@@ -34,9 +33,8 @@ const createImageMarker = (
         display: flex;
         align-items: center;
         justify-content: center;
-        opacity: ${opacity};
-        filter: blur(${blurPx}px);
-        transition: opacity 0.3s ease, filter 0.3s ease; /* Smooth transitions */
+        /* No opacity or blur here! */
+        transition: opacity 0.3s ease, filter 0.3s ease;
       ">
         <img 
           src="/images/thumbnails/${imageName}_thumb.png" 
@@ -53,7 +51,7 @@ const createImageMarker = (
           left: 0;
           width: 100%;
           height: 100%;
-          background: rgba(144,238,144,0.7); /* Greenish tint for clicked/discovered */
+          background: rgba(144,238,144,0.7);
           border-radius: 50%;
         "></div>` : ''}
       </div>
@@ -312,6 +310,8 @@ const MemoizedLandmarkMarker: React.FC<LandmarkMarkerProps> = React.memo(({
   const [currentOpacity, setCurrentOpacity] = useState<number>(1);
   const [currentBlurPx, setCurrentBlurPx] = useState<number>(0);
   const [isVisible, setIsVisible] = useState<boolean>(true);
+  // Unique marker id for DOM selection
+  const markerId = `marker-${landmark.name.replace(/\s+/g, '-')}`;
 
   useEffect(() => {
     let newDistance: number | null = null;
@@ -321,66 +321,59 @@ const MemoizedLandmarkMarker: React.FC<LandmarkMarkerProps> = React.memo(({
 
     if (mapMode === 'explorer' && userLocation) {
       if (isClicked) {
-        // If revealed, always show at full opacity and resolution
         newOpacity = 1;
         newBlurPx = 0;
         newIsVisible = true;
-        console.log(`[Debug ${landmark.name}] Revealed in explorer mode. Full opacity and resolution.`);
       } else {
         const landmarkLatLng = L.latLng(landmark.lat, landmark.lng);
         newDistance = haversineDistance(
           { lat: userLocation.lat, lng: userLocation.lng },
           { lat: landmark.lat, lng: landmark.lng }
         );
-        
-        console.log(`[Debug ${landmark.name}] UserLoc: ${userLocation.lat},${userLocation.lng} | LandmarkLoc: ${landmark.lat},${landmark.lng} | Distance (Haversine): ${newDistance?.toFixed(1)}m`);
-
         if (newDistance > DISCOVERY_RADIUS) {
           newIsVisible = false;
-          console.log(`[Debug ${landmark.name}] Too far. IsVisible: false (Distance ${newDistance.toFixed(1)}m > ${DISCOVERY_RADIUS}m)`);
         } else {
           newOpacity = MIN_OPACITY + (1 - MIN_OPACITY) * Math.max(0, (DISCOVERY_RADIUS - newDistance) / (DISCOVERY_RADIUS - INTERACTION_RADIUS));
           newOpacity = Math.min(1, Math.max(MIN_OPACITY, newOpacity));
-          
           newBlurPx = MAX_BLUR_PX * Math.max(0, (newDistance - INTERACTION_RADIUS) / (DISCOVERY_RADIUS - INTERACTION_RADIUS));
           newBlurPx = Math.min(MAX_BLUR_PX, Math.max(0, newBlurPx));
-          console.log(`[Debug ${landmark.name}] In range. Opacity: ${newOpacity.toFixed(2)}, Blur: ${newBlurPx.toFixed(1)}px. IsVisible: true`);
         }
       }
     } else if (mapMode === 'atlas') {
-      console.log(`[Debug ${landmark.name}] Atlas mode. Opacity: 1, Blur: 0, IsVisible: true`);
+      newOpacity = 1;
+      newBlurPx = 0;
+      newIsVisible = true;
     } else if (!userLocation && mapMode === 'explorer'){
-      newIsVisible = false; // Hide if explorer mode and no user location yet
-      console.log(`[Debug ${landmark.name}] Explorer mode, no user location yet. IsVisible: false`);
+      newIsVisible = false;
     }
-    
     setCurrentDistance(newDistance);
-    const finalOpacity = mapMode === 'atlas' ? 1 : newOpacity;
-    const finalBlurPx = mapMode === 'atlas' ? 0 : newBlurPx;
-    const finalIsVisible = mapMode === 'atlas' ? true : newIsVisible;
-
-    setCurrentOpacity(finalOpacity);
-    setCurrentBlurPx(finalBlurPx);
-    setIsVisible(finalIsVisible);
-
-    console.log(`[Debug ${landmark.name}] Final States - Visible: ${finalIsVisible}, Opacity: ${finalOpacity.toFixed(2)}, Blur: ${finalBlurPx.toFixed(1)}px, Distance: ${newDistance?.toFixed(1)}m`);
-
+    setCurrentOpacity(mapMode === 'atlas' ? 1 : newOpacity);
+    setCurrentBlurPx(mapMode === 'atlas' ? 0 : newBlurPx);
+    setIsVisible(mapMode === 'atlas' ? true : newIsVisible);
   }, [landmark, userLocation, mapMode, isClicked]);
+
+  // Update marker DOM node's style for blur/opacity
+  useEffect(() => {
+    // Wait for DOM to update
+    const el = document.querySelector(`.custom-marker-inner[data-marker-id='${markerId}']`) as HTMLElement;
+    if (el) {
+      el.style.opacity = String(currentOpacity);
+      el.style.filter = `blur(${currentBlurPx}px)`;
+      el.style.transition = 'opacity 0.3s ease, filter 0.3s ease';
+    }
+  }, [currentOpacity, currentBlurPx, markerId]);
 
   const icon = useMemo(() => {
     return createImageMarker(
       landmark.image,
       isClicked,
-      currentOpacity,
-      currentBlurPx
+      markerId
     );
-  }, [landmark.image, isClicked, currentOpacity, currentBlurPx]);
+  }, [landmark.image, isClicked, markerId]);
 
   const handleInteraction = () => {
     if (mapMode === 'explorer' && userLocation && currentDistance !== null) {
       if (currentDistance > INTERACTION_RADIUS) {
-        console.log(`Too far to interact with ${landmark.name}. Needs to be within ${INTERACTION_RADIUS}m, currently ${currentDistance.toFixed(1)}m`);
-        // Optionally, provide feedback like a subtle shake or a toast message
         return;
       }
     }
@@ -388,7 +381,7 @@ const MemoizedLandmarkMarker: React.FC<LandmarkMarkerProps> = React.memo(({
   };
   
   if (!isVisible) {
-    return null; // Don't render if too far in explorer mode and not in seeAll mode
+    return null;
   }
 
   return (
