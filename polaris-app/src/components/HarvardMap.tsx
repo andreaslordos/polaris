@@ -535,7 +535,7 @@ export default function HarvardMap() {
     );
   }
   return (
-    <div className="map-container relative h-full w-full flex flex-col">
+    <div className="map-container relative flex-1 min-h-0 flex flex-col">
       {showIntroModal && <IntroModal onClose={handleIntroModalClose} />}
       {isOffline && !tilesLoaded && (
         <div className="absolute top-0 left-0 right-0 z-50 bg-yellow-500 text-white p-2 text-center">
@@ -547,7 +547,7 @@ export default function HarvardMap() {
           Using cached map tiles in offline mode.
         </div>
       )}
-      <div className="bg-black text-white h-16 flex items-center justify-between px-4">
+      <div className="bg-black text-white h-16 flex items-center justify-between px-4 shrink-0">
         <h1 className="text-2xl font-extrabold tracking-wide">POLARIS</h1>
         <div className="flex items-center space-x-2">
           {mapMode === 'explorer' && (
@@ -580,7 +580,7 @@ export default function HarvardMap() {
           </button>
         </div>
       </div>
-      <div className="flex-1 relative">
+      <div className="flex-1 min-h-0 relative">
         <MapContainer
           ref={mapRef}
           center={[HARVARD_YARD.lat, HARVARD_YARD.lng]}
@@ -614,12 +614,6 @@ export default function HarvardMap() {
             />
           ))}
         </MapContainer>
-        <a 
-          href="sms:+18574458893?body=Hi%20Andreas%2C%20this%20is%20about%20Polaris. "
-          className="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-xs text-gray-400 hover:text-white transition-colors bg-black/50 px-2 py-1 rounded"
-        >
-          feedback
-        </a>
       </div>
     </div>
   );

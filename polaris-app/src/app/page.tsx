@@ -2,7 +2,7 @@ import MapWrapper from '@/components/MapWrapper';
 
 export default function Home() {
   return (
-    <main className="min-h-screen">
+    <main className="h-full flex flex-col">
       <MapWrapper />
     </main>
   );
