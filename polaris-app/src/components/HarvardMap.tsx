@@ -1,13 +1,24 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import ChatModal from './ChatModal'; // We'll rename this later
 import ChatView from './ChatView';
+
+// Gamification Constants
+const DISCOVERY_RADIUS = 25; // meters
+const INTERACTION_RADIUS = 5; // meters
+const MIN_OPACITY = 0.2;
+const MAX_BLUR_PX = 8; // pixels
+
 // Custom image marker icon
-const createImageMarker = (imageName: string, isClicked: boolean = false) => {
+const createImageMarker = (
+  imageName: string, 
+  isClicked: boolean = false,
+  opacity: number = 1,
+  blurPx: number = 0
+) => {
   return L.divIcon({
     className: 'custom-marker',
     html: `
@@ -22,6 +33,9 @@ const createImageMarker = (imageName: string, isClicked: boolean = false) => {
         display: flex;
         align-items: center;
         justify-content: center;
+        opacity: ${opacity};
+        filter: blur(${blurPx}px);
+        transition: opacity 0.3s ease, filter 0.3s ease; /* Smooth transitions */
       ">
         <img 
           src="/images/thumbnails/${imageName}_thumb.png" 
@@ -38,7 +52,7 @@ const createImageMarker = (imageName: string, isClicked: boolean = false) => {
           left: 0;
           width: 100%;
           height: 100%;
-          background: rgba(144,238,144,0.7);
+          background: rgba(144,238,144,0.7); /* Greenish tint for clicked/discovered */
           border-radius: 50%;
         "></div>` : ''}
       </div>
@@ -206,10 +220,24 @@ function MapDebug() {
   return null;
 }
 
+type MapMode = 'explorer' | 'seeAll';
+
+// Define a more specific type for Landmark if possible
+interface Landmark {
+  name: string;
+  lat: number;
+  lng: number;
+  description: string;
+  image: string;
+}
+
 // User location component
-function UserLocation() {
+interface UserLocationProps {
+  onLocationUpdate: (location: L.LatLng) => void;
+}
+
+function UserLocation({ onLocationUpdate }: UserLocationProps) {
   const map = useMap();
-  const [position, setPosition] = useState<L.LatLng | null>(null);
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -220,7 +248,7 @@ function UserLocation() {
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         const newPos = L.latLng(pos.coords.latitude, pos.coords.longitude);
-        setPosition(newPos);
+        onLocationUpdate(newPos);
       },
       (err) => {
         console.error('Error getting location:', err);
@@ -230,23 +258,134 @@ function UserLocation() {
     return () => {
       navigator.geolocation.clearWatch(watchId);
     };
-  }, []);
+  }, [map, onLocationUpdate]);
 
-  return position ? (
-    <Marker position={position} icon={createUserLocationMarker()}>
-      <Popup>You are here</Popup>
-    </Marker>
-  ) : null;
+  return null;
 }
+
+// Memoized Landmark Marker Component
+interface LandmarkMarkerProps {
+  landmark: Landmark;
+  isClicked: boolean;
+  userLocation: L.LatLng | null;
+  mapMode: MapMode;
+  onMarkerClick: (landmark: Landmark, distance: number | null) => void;
+}
+
+const MemoizedLandmarkMarker: React.FC<LandmarkMarkerProps> = React.memo(({
+  landmark,
+  isClicked,
+  userLocation,
+  mapMode,
+  onMarkerClick
+}) => {
+  const [currentDistance, setCurrentDistance] = useState<number | null>(null);
+  const [currentOpacity, setCurrentOpacity] = useState<number>(1);
+  const [currentBlurPx, setCurrentBlurPx] = useState<number>(0);
+  const [isVisible, setIsVisible] = useState<boolean>(true);
+
+  useEffect(() => {
+    let newDistance: number | null = null;
+    let newOpacity = 1;
+    let newBlurPx = 0;
+    let newIsVisible = true;
+
+    if (mapMode === 'explorer' && userLocation) {
+      const landmarkLatLng = L.latLng(landmark.lat, landmark.lng);
+      newDistance = userLocation.distanceTo(landmarkLatLng);
+      
+      console.log(`[Debug ${landmark.name}] UserLoc: ${userLocation.lat},${userLocation.lng} | LandmarkLoc: ${landmark.lat},${landmark.lng} | Distance: ${newDistance?.toFixed(1)}m`);
+
+      if (newDistance > DISCOVERY_RADIUS) {
+        newIsVisible = false;
+        console.log(`[Debug ${landmark.name}] Too far. IsVisible: false (Distance ${newDistance.toFixed(1)}m > ${DISCOVERY_RADIUS}m)`);
+      } else {
+        newOpacity = MIN_OPACITY + (1 - MIN_OPACITY) * Math.max(0, (DISCOVERY_RADIUS - newDistance) / (DISCOVERY_RADIUS - INTERACTION_RADIUS));
+        newOpacity = Math.min(1, Math.max(MIN_OPACITY, newOpacity));
+        
+        newBlurPx = MAX_BLUR_PX * Math.max(0, (newDistance - INTERACTION_RADIUS) / (DISCOVERY_RADIUS - INTERACTION_RADIUS));
+        newBlurPx = Math.min(MAX_BLUR_PX, Math.max(0, newBlurPx));
+        console.log(`[Debug ${landmark.name}] In range. Opacity: ${newOpacity.toFixed(2)}, Blur: ${newBlurPx.toFixed(1)}px. IsVisible: true`);
+      }
+    } else if (mapMode === 'seeAll') {
+      console.log(`[Debug ${landmark.name}] SeeAll mode. Opacity: 1, Blur: 0, IsVisible: true`);
+    } else if (!userLocation && mapMode === 'explorer'){
+      newIsVisible = false; // Hide if explorer mode and no user location yet
+      console.log(`[Debug ${landmark.name}] Explorer mode, no user location yet. IsVisible: false`);
+    }
+    
+    setCurrentDistance(newDistance);
+    const finalOpacity = mapMode === 'seeAll' ? 1 : newOpacity;
+    const finalBlurPx = mapMode === 'seeAll' ? 0 : newBlurPx;
+    const finalIsVisible = mapMode === 'seeAll' ? true : newIsVisible;
+
+    setCurrentOpacity(finalOpacity);
+    setCurrentBlurPx(finalBlurPx);
+    setIsVisible(finalIsVisible);
+
+    console.log(`[Debug ${landmark.name}] Final States - Visible: ${finalIsVisible}, Opacity: ${finalOpacity.toFixed(2)}, Blur: ${finalBlurPx.toFixed(1)}px, Distance: ${newDistance?.toFixed(1)}m`);
+
+  }, [landmark, userLocation, mapMode, isClicked]);
+
+  const icon = useMemo(() => {
+    return createImageMarker(
+      landmark.image,
+      isClicked,
+      currentOpacity,
+      currentBlurPx
+    );
+  }, [landmark.image, isClicked, currentOpacity, currentBlurPx]);
+
+  const handleInteraction = () => {
+    if (mapMode === 'explorer' && userLocation && currentDistance !== null) {
+      if (currentDistance > INTERACTION_RADIUS) {
+        console.log(`Too far to interact with ${landmark.name}. Needs to be within ${INTERACTION_RADIUS}m, currently ${currentDistance.toFixed(1)}m`);
+        // Optionally, provide feedback like a subtle shake or a toast message
+        return;
+      }
+    }
+    onMarkerClick(landmark, currentDistance);
+  };
+  
+  if (!isVisible) {
+    return null; // Don't render if too far in explorer mode and not in seeAll mode
+  }
+
+  return (
+    <Marker
+      position={[landmark.lat, landmark.lng]}
+      icon={icon}
+      eventHandlers={{ click: handleInteraction }}
+    >
+      <Popup>
+        <div className="p-2 bg-white rounded-lg shadow-lg">
+          <h3 className="font-bold text-lg mb-1 text-[#FF6B6B]">{landmark.name}</h3>
+          <p className="text-sm text-gray-600">{landmark.description}</p>
+          {mapMode === 'explorer' && userLocation && currentDistance !== null && (
+             <p className="text-xs text-gray-500 mt-1">
+               Distance: {currentDistance.toFixed(1)}m. 
+               {currentDistance > INTERACTION_RADIUS ? ` Get closer to interact (within ${INTERACTION_RADIUS}m).` : ' Click to explore!'}
+             </p>
+          )}
+        </div>
+      </Popup>
+    </Marker>
+  );
+});
+MemoizedLandmarkMarker.displayName = 'MemoizedLandmarkMarker';
 
 export default function HarvardMap() {
   const mapRef = useRef(null);
   const [isOffline, setIsOffline] = useState(false);
   const [tilesLoaded, setTilesLoaded] = useState(false);
   const [selectedLandmark, setSelectedLandmark] = useState<any | null>(null);
-  const [showChat, setShowChat] = useState(false); // New state to control view
-  // Track clicked landmarks for progress
+  const [showChat, setShowChat] = useState(false);
   const [clickedMarkers, setClickedMarkers] = useState<Set<string>>(new Set());
+  const [userLocation, setUserLocation] = useState<L.LatLng | null>(null);
+  const [mapMode, setMapMode] = useState<MapMode>('explorer');
+
+  // Typed LANDMARKS constant
+  const typedLandmarks: Landmark[] = LANDMARKS;
 
   // Load clicked markers from localStorage on mount
   useEffect(() => {
@@ -314,12 +453,22 @@ export default function HarvardMap() {
     }
   }, []);
 
-  const handleMarkerClick = (landmark: any) => {
+  const handleMarkerClick = (landmark: Landmark, distance: number | null) => {
+    if (mapMode === 'explorer' && userLocation && distance !== null) {
+      if (distance > INTERACTION_RADIUS) {
+        console.log(`Too far to interact with ${landmark.name}. Distance: ${distance.toFixed(1)}m`);
+        return;
+      }
+    }
     // Mark this landmark as clicked
     setClickedMarkers(prev => new Set(prev).add(landmark.name));
     setSelectedLandmark(landmark);
     setShowChat(true); // Switch to chat view
     console.log("Selected landmark:", landmark);
+  };
+
+  const toggleMapMode = () => {
+    setMapMode(prevMode => prevMode === 'explorer' ? 'seeAll' : 'explorer');
   };
 
   // If showing chat, don't render the map
@@ -343,9 +492,30 @@ export default function HarvardMap() {
           Using cached map tiles in offline mode.
         </div>
       )}
-      <div className="bg-black text-white h-10 flex items-center justify-center">
+      <div className="bg-black text-white h-16 flex items-center justify-between px-4">
         <h1 className="text-2xl font-extrabold tracking-wide">POLARIS</h1>
+        <div className="flex items-center space-x-2">
+          <button 
+            onClick={toggleMapMode}
+            className="text-xs bg-blue-500 hover:bg-blue-700 text-white py-1 px-2 rounded"
+          >
+            Mode: {mapMode === 'explorer' ? 'Explorer' : 'See All'}
+          </button>
+          {mapMode === 'explorer' && (
+            <div className="text-xs">
+              Unlocked: {clickedMarkers.size} / {LANDMARKS.length}
+            </div>
+          )}
+        </div>
       </div>
+      {mapMode === 'explorer' && (
+        <div className="w-full bg-gray-200 h-1">
+          <div 
+            className="bg-green-500 h-1" 
+            style={{ width: `${(clickedMarkers.size / LANDMARKS.length) * 100}%` }}
+          ></div>
+        </div>
+      )}
       <div className="flex-1 relative">
         <MapContainer
           ref={mapRef}
@@ -363,23 +533,21 @@ export default function HarvardMap() {
             url={TILE_LAYER_URL}
             {...tileLayerOptions}
           />
-          <UserLocation />
-          {LANDMARKS.map((landmark, index) => (
-            <Marker
-              key={index}
-              position={[landmark.lat, landmark.lng]}
-              icon={createImageMarker(landmark.image, clickedMarkers.has(landmark.name))}
-              eventHandlers={{
-                click: () => handleMarkerClick(landmark),
-              }}
-            >
-              <Popup>
-                <div className="p-2 bg-white rounded-lg shadow-lg">
-                  <h3 className="font-bold text-lg mb-1 text-[#FF6B6B]">{landmark.name}</h3>
-                  <p className="text-sm text-gray-600">{landmark.description}</p>
-                </div>
-              </Popup>
+          <UserLocation onLocationUpdate={setUserLocation} />
+          {userLocation && (
+            <Marker position={userLocation} icon={createUserLocationMarker()}>
+              <Popup>You are here</Popup>
             </Marker>
+          )}
+          {typedLandmarks.map((landmark) => (
+            <MemoizedLandmarkMarker
+              key={landmark.name} // Assuming landmark.name is unique and stable
+              landmark={landmark}
+              isClicked={clickedMarkers.has(landmark.name)}
+              userLocation={userLocation}
+              mapMode={mapMode}
+              onMarkerClick={handleMarkerClick}
+            />
           ))}
         </MapContainer>
         <a 
